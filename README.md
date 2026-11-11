@@ -369,6 +369,7 @@ report    「共 2 轮，产物 19 个」
 | 产物 `clean.mp4` + `detect_report.json` | `backend/outputs/<run_id>/` | ✅ |
 | 完整链路测试（输入→落盘→质检通过） | `tests/test_pipeline.py` | ✅ |
 | 日志可见「不达标 → 重生成 → 达标」 | SSE 事件序列 / `run_log.json` | ✅ |
+
 ---
 
 ## 八、本仓库的目录结构
