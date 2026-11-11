@@ -412,11 +412,11 @@
         <div class="panel-head"><span class="t">原片 / 成品</span><span class="spacer"></span><span class="tag" id="syncTag">同步播放</span></div>
         <div class="videos">
           <div class="vwrap">
-            <video id="vSrc" src="assets/source.mp4" muted loop playsinline preload="metadata"></video>
+            <video id="vSrc" src="assets/source.mp4" poster="assets/poster_source.jpg" muted loop playsinline preload="auto"></video>
             <div class="vlabel"><b>原片</b><span>1280×720 · 6s · 有音轨</span></div>
           </div>
           <div class="vwrap">
-            <video id="vClean" src="assets/clean.mp4" muted loop playsinline preload="metadata"></video>
+            <video id="vClean" src="assets/clean.mp4" poster="assets/poster_clean.jpg" muted loop playsinline preload="auto"></video>
             <div class="vlabel"><b>成品</b><span class="badge-live">水印已移除</span></div>
           </div>
         </div>
@@ -911,12 +911,28 @@ run_tests.bat
     clockEl.textContent = fmt(total) + " / " + fmt(total);
   }
 
+  function playWhenReady(v) {
+    var attemptPlay = function () {
+      try {
+        var p = v.play();
+        if (p && p.catch) p.catch(function () {
+          v.addEventListener("canplay", function once() {
+            v.removeEventListener("canplay", once);
+            try { var q = v.play(); if (q && q.catch) q.catch(function () {}); } catch (e) {}
+          });
+        });
+      } catch (e) {}
+    };
+    if (v.readyState >= 2) attemptPlay();
+    else v.addEventListener("loadeddata", attemptPlay, { once: true });
+  }
+
   function startVideos() {
     try {
-      vSrc.currentTime = 0.2; vClean.currentTime = 0.2;
-      var p1 = vSrc.play(), p2 = vClean.play();
-      if (p1 && p1.catch) p1.catch(function () {});
-      if (p2 && p2.catch) p2.catch(function () {});
+      if (vSrc.readyState >= 1) vSrc.currentTime = 0.2;
+      if (vClean.readyState >= 1) vClean.currentTime = 0.2;
+      playWhenReady(vSrc);
+      playWhenReady(vClean);
     } catch (e) { /* autoplay 被拦时忽略 */ }
   }
   function stopVideos() {
