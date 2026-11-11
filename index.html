@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>视频自动去水印工具 · 多智能体流水线</title>
+<meta name="description" content="检测 → 遮罩 → 修复 → 精修 → 质检 的多智能体视频去水印流水线：多帧投票检测水印、半透明叠加整框修复、邻近块移植补纹理、质检不达标自动回灌。本页是一次真实运行的完整回放。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232dd4bf'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle' font-family='sans-serif' fill='%23071319'%3E%E5%8E%BB%3C/text%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#080d17; --bg2:#0b1220; --panel:#111a2b; --panel2:#0e1626;
+    --line:#1e2b44; --line2:#27374f; --ink:#e7eefb; --muted:#93a7c4; --dim:#6b7f9e;
+    --teal:#2dd4bf; --teal2:#14b8a6; --green:#34d399; --amber:#f5b942; --red:#f87171;
+    --blue:#7aa2ff; --violet:#b594ff; --radius:14px;
+    --mono:"Cascadia Code","JetBrains Mono",Consolas,"SFMono-Regular",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;font-family:var(--sans);color:var(--ink);line-height:1.65;
+    background:
+      radial-gradient(1200px 600px at 12% -10%,rgba(45,212,191,.16),transparent 60%),
+      radial-gradient(900px 500px at 92% 8%,rgba(122,162,255,.13),transparent 62%),
+      var(--bg);
+  }
+  a{color:var(--teal);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+  .mono{font-family:var(--mono)}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+
+  /* ---------- header ---------- */
+  header.top{
+    position:sticky;top:0;z-index:30;backdrop-filter:blur(14px);
+    background:rgba(8,13,23,.82);border-bottom:1px solid var(--line);
+  }
+  .top-in{display:flex;align-items:center;gap:16px;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.2px}
+  .logo{
+    width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(140deg,var(--teal),#0ea5a3);color:#04121a;font-weight:800;font-size:15px;
+  }
+  .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--dim);letter-spacing:0}
+  .nav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+  .nav a{
+    color:var(--muted);font-size:13.5px;padding:6px 10px;border-radius:8px;
+  }
+  .nav a:hover{color:var(--ink);background:rgba(255,255,255,.05);text-decoration:none}
+  .gh{
+    display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);
+    padding:6px 11px;border-radius:999px;font-size:13px;color:var(--ink)!important;background:rgba(255,255,255,.03);
+  }
+  .gh:hover{background:rgba(45,212,191,.12);border-color:rgba(45,212,191,.5);text-decoration:none}
+
+  /* ---------- hero ---------- */
+  .hero{padding:56px 0 34px;display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:center}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--teal);
+    border:1px solid rgba(45,212,191,.35);background:rgba(45,212,191,.08);padding:5px 12px;border-radius:999px;margin-bottom:16px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 3px rgba(45,212,191,.18)}
+  h1{font-size:44px;line-height:1.16;margin:0 0 12px;letter-spacing:-.6px}
+  h1 em{font-style:normal;color:var(--teal)}
+  .lead{color:var(--muted);font-size:16px;margin:0 0 22px;max-width:520px}
+  .cta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:11px;
+    font-size:14.5px;font-weight:600;border:1px solid transparent;cursor:pointer;font-family:inherit;
+    transition:transform .12s ease,background .15s ease,border-color .15s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:linear-gradient(140deg,var(--teal),#0f9e9a);color:#04121a}
+  .btn.primary:hover{filter:brightness(1.07);text-decoration:none}
+  .btn.ghost{background:rgba(255,255,255,.03);border-color:var(--line2);color:var(--ink)}
+  .btn.ghost:hover{background:rgba(255,255,255,.07);text-decoration:none}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:12.5px;color:var(--muted);border:1px solid var(--line);background:var(--panel2);
+    padding:5px 10px;border-radius:8px}
+  .chip b{color:var(--ink);font-weight:600}
+
+  .shot{border:1px solid var(--line2);border-radius:18px;overflow:hidden;background:var(--panel);
+    box-shadow:0 30px 70px -40px rgba(0,0,0,.9),0 0 0 1px rgba(45,212,191,.06) inset}
+  .shot img{display:block;width:100%;height:auto}
+  .shot-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);
+    font-size:12px;color:var(--dim);background:var(--panel2)}
+  .shot-bar i{width:8px;height:8px;border-radius:50%;background:#324056;display:block}
+  .shot-bar i:nth-child(1){background:#f87171}.shot-bar i:nth-child(2){background:#f5b942}.shot-bar i:nth-child(3){background:#34d399}
+  .shot-cap{display:flex;justify-content:space-between;padding:10px 14px;font-size:12.5px;color:var(--muted);
+    border-top:1px solid var(--line)}
+
+  /* ---------- section ---------- */
+  section{padding:46px 0;border-top:1px solid rgba(30,43,68,.65)}
+  .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:26px}
+  h2{font-size:27px;margin:0;letter-spacing:-.3px}
+  h2 span{color:var(--dim);font-weight:400;font-size:15px;margin-left:10px;letter-spacing:0}
+  .sec-note{color:var(--muted);font-size:13.5px;max-width:520px;text-align:right}
+  h3{font-size:16.5px;margin:0 0 8px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+  .pad{padding:18px}
+
+  /* ---------- auth notice ---------- */
+  .auth{
+    display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;
+    border:1px solid rgba(245,185,66,.42);background:
+      linear-gradient(180deg,rgba(245,185,66,.12),rgba(245,185,66,.04));
+    border-radius:var(--radius);padding:16px 18px;
+  }
+  .auth .ico{font-size:20px;line-height:1.2;color:var(--amber)}
+  .auth b{color:var(--amber)}
+  .auth p{margin:4px 0 0;color:#d9c9a4;font-size:13.8px;max-width:980px}
+
+  /* ---------- replay ---------- */
+  .replay{display:grid;grid-template-columns:1.12fr .88fr;gap:18px}
+  .panel-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);
+    font-size:13px;color:var(--muted)}
+  .panel-head .t{color:var(--ink);font-weight:600;font-size:13.5px}
+  .panel-head .spacer{margin-left:auto}
+  .tag{font-size:11.5px;border:1px solid var(--line2);border-radius:6px;padding:2px 7px;color:var(--muted)}
+  .tag.live{color:var(--teal);border-color:rgba(45,212,191,.45);background:rgba(45,212,191,.08)}
+
+  .dag{display:flex;flex-wrap:wrap;gap:7px;padding:14px 16px 4px}
+  .node{
+    position:relative;flex:1 1 96px;min-width:92px;border:1px solid var(--line2);border-radius:10px;
+    background:var(--panel2);padding:8px 9px;transition:.18s ease;
+  }
+  .node .n{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+  .node .k{font-size:10.5px;color:var(--dim);font-family:var(--mono);margin-top:2px}
+  .node .bd{position:absolute;top:6px;right:7px;font-size:10px;color:var(--dim)}
+  .node[data-state="running"]{border-color:rgba(45,212,191,.65);background:rgba(45,212,191,.1);
+    box-shadow:0 0 0 3px rgba(45,212,191,.07)}
+  .node[data-state="running"] .n::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--teal);
+    animation:pulse 1s infinite}
+  .node[data-state="done"]{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.09)}
+  .node[data-state="done"] .n::before{content:"✓";color:var(--green);font-size:11px}
+  .node[data-state="fail"]{border-color:rgba(248,113,113,.6);background:rgba(248,113,113,.1)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+  .progress-row{display:flex;align-items:center;gap:12px;padding:12px 16px 6px}
+  .bar{flex:1;height:7px;background:#16203200;border-radius:99px;overflow:hidden;
+    background:#172236;border:1px solid var(--line)}
+  .bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal2),var(--teal));
+    border-radius:99px;transition:width .25s ease}
+  .pct{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:42px;text-align:right}
+
+  .controls{display:flex;align-items:center;gap:8px;padding:10px 16px 14px;flex-wrap:wrap}
+  .mini{border:1px solid var(--line2);background:rgba(255,255,255,.03);color:var(--muted);
+    border-radius:8px;font-size:12.5px;padding:5px 10px;cursor:pointer;font-family:inherit}
+  .mini:hover{color:var(--ink);border-color:#3a4d6d}
+  .mini[aria-pressed="true"]{color:#04121a;background:var(--teal);border-color:var(--teal);font-weight:700}
+  .clock{font-family:var(--mono);font-size:12px;color:var(--dim);margin-left:auto}
+
+  .log{
+    height:352px;overflow:auto;padding:10px 14px 16px;font-family:var(--mono);font-size:12.3px;line-height:1.6;
+    background:linear-gradient(180deg,rgba(9,14,24,.6),rgba(9,14,24,.95));
+  }
+  .log .ln{display:grid;grid-template-columns:62px 1fr;gap:10px;padding:2px 0;border-bottom:1px dashed rgba(30,43,68,.5)}
+  .log .ts{color:#54698a}
+  .log .msg{color:#c3d3ea;word-break:break-word}
+  .log .ln[data-k="done"] .msg{color:#a7ecd4}
+  .log .ln[data-k="start"] .msg{color:#e7eefb}
+  .log .ln[data-k="fb"] .msg{color:var(--amber)}
+  .log .ln[data-k="llm"] .msg{color:var(--blue)}
+  .log .ln[data-k="end"] .msg{color:var(--green);font-weight:600}
+  .log .agent{color:var(--teal)}
+
+  .videos{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 16px 6px}
+  .vwrap{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#05090f}
+  .vwrap video{display:block;width:100%;height:auto;aspect-ratio:16/9;background:#05090f}
+  .vlabel{display:flex;justify-content:space-between;padding:7px 10px;font-size:12px;color:var(--muted);
+    border-top:1px solid var(--line)}
+  .vlabel b{color:var(--ink);font-weight:600}
+  .badge-live{color:var(--green)}
+
+  .scorecard{padding:4px 16px 16px}
+  .score-top{display:grid;grid-template-columns:104px 1fr;gap:16px;align-items:center;margin:6px 0 12px}
+  .ring{
+    width:104px;height:104px;border-radius:50%;display:grid;place-items:center;position:relative;
+    background:conic-gradient(var(--teal) calc(var(--p)*1%),#1a2437 0);
+  }
+  .ring::before{content:"";position:absolute;inset:8px;border-radius:50%;background:var(--panel)}
+  .ring .val{position:relative;text-align:center;line-height:1.1}
+  .ring .val b{font-size:25px;letter-spacing:-.5px}
+  .ring .val small{display:block;font-size:10.5px;color:var(--dim)}
+  .verdict{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--green);
+    border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.1);padding:4px 10px;border-radius:999px}
+  .kvs{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted);margin-top:8px}
+  .kvs b{color:var(--ink);font-weight:600}
+
+  .dims{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin:4px 0 14px}
+  .dim .row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:4px}
+  .dim .row b{color:var(--ink)}
+  .dim .track{height:5px;background:#182236;border-radius:99px;overflow:hidden}
+  .dim .track i{display:block;height:100%;background:linear-gradient(90deg,#0f766e,var(--teal))}
+  .dim .det{font-size:11.5px;color:var(--dim);margin-top:3px}
+
+  .failbox{border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.07);border-radius:10px;
+    padding:10px 12px;font-size:12.8px;color:#ffc9c9;margin:8px 0 12px}
+  .failbox b{color:#ff9b9b;display:block;margin-bottom:4px;font-size:12px;letter-spacing:.3px}
+  .failbox li{margin:2px 0}
+
+  .quote{border-left:3px solid var(--teal);background:rgba(45,212,191,.06);padding:9px 12px;border-radius:0 8px 8px 0;
+    font-size:13px;color:#cfeee8;margin:6px 0 12px}
+
+  .links{display:flex;gap:8px;flex-wrap:wrap}
+
+  /* ---------- tables / code ---------- */
+  table{width:100%;border-collapse:collapse;font-size:12.8px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:500;font-size:11.5px;letter-spacing:.4px;text-transform:uppercase}
+  td.mono{font-family:var(--mono);font-size:12px;color:#c3d3ea}
+  tr:last-child td{border-bottom:none}
+
+  pre{margin:0;background:#070c15;border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+    overflow:auto;font-family:var(--mono);font-size:12.6px;line-height:1.7;color:#bfd2ec}
+  pre .c{color:#55698a}
+  pre .k{color:#f0a6ca}
+  pre .s{color:#9ae6b4}
+  code.inl{font-family:var(--mono);font-size:12.4px;background:#0d1524;border:1px solid var(--line);
+    padding:1px 6px;border-radius:6px;color:#bfe9e2}
+
+  /* ---------- arch ---------- */
+  .flow{display:grid;gap:12px;margin-bottom:22px}
+  .layer{display:grid;grid-template-columns:78px 1fr;gap:12px;align-items:center}
+  .layer .no{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .layer .cells{display:flex;gap:10px;flex-wrap:wrap}
+  .acell{flex:1 1 180px;border:1px solid var(--line2);background:var(--panel);border-radius:11px;padding:10px 12px}
+  .acell .an{font-size:13.5px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+  .acell .an span{font-family:var(--mono);font-size:11px;color:var(--dim);font-weight:400}
+  .acell .ad{font-size:12.3px;color:var(--muted);margin-top:3px}
+  .fbline{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--amber);
+    border:1px dashed rgba(245,185,66,.4);border-radius:10px;padding:8px 12px;background:rgba(245,185,66,.05)}
+
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .algo h3{display:flex;align-items:center;gap:8px}
+  .algo h3 .n{width:22px;height:22px;border-radius:6px;background:rgba(45,212,191,.14);color:var(--teal);
+    font-size:11.5px;display:grid;place-items:center;font-family:var(--mono)}
+  .algo p{margin:0;color:var(--muted);font-size:13.2px}
+  .algo p b{color:#d6e5f8;font-weight:600}
+  .algo .metric{margin-top:9px;font-family:var(--mono);font-size:11.8px;color:var(--teal)}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .stat b{display:block;font-size:30px;letter-spacing:-1px;line-height:1.15}
+  .stat span{color:var(--muted);font-size:12.5px}
+  .stat .sub{display:block;margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  .stat.teal b{color:var(--teal)}.stat.green b{color:var(--green)}
+  .stat.amber b{color:var(--amber)}.stat.blue b{color:var(--blue)}
+
+  /* ---------- gallery ---------- */
+  .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:stretch}
+  .gallery figure{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel2);
+    display:flex;flex-direction:column}
+  .gallery img{display:block;width:100%;height:auto;max-height:300px;object-fit:contain;background:#080d18;flex:1 1 auto}
+  .gallery figcaption{padding:6px 8px;font-size:11.5px;color:var(--muted);font-family:var(--mono);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid var(--line)}
+  .gallery .span2{grid-column:span 2}
+  .gallery .span3{grid-column:span 3}
+  .gallery .span3 img{max-height:none}
+
+  /* ---------- deploy ---------- */
+  .deploy{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .step{display:grid;grid-template-columns:26px 1fr;gap:10px;margin-bottom:14px}
+  .step .i{width:26px;height:26px;border-radius:8px;background:rgba(45,212,191,.12);color:var(--teal);
+    display:grid;place-items:center;font-size:12px;font-family:var(--mono)}
+  .step p{margin:2px 0 6px;color:var(--muted);font-size:13px}
+  .note{font-size:12.5px;color:var(--dim)}
+  ul.clean{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+  ul.clean li{margin:3px 0}
+  ul.clean b{color:var(--ink)}
+
+  footer{border-top:1px solid var(--line);padding:26px 0 40px;color:var(--dim);font-size:12.5px}
+  .foot-in{display:flex;gap:18px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+
+  @media (max-width:1000px){
+    .hero{grid-template-columns:1fr;gap:28px}
+    h1{font-size:36px}
+    .replay{grid-template-columns:1fr}
+    .grid3{grid-template-columns:1fr 1fr}
+    .stats{grid-template-columns:1fr 1fr}
+    .deploy{grid-template-columns:1fr}
+    .gallery{grid-template-columns:repeat(3,1fr)}
+  }
+  @media (max-width:680px){
+    .grid3,.grid2,.stats,.gallery{grid-template-columns:1fr 1fr}
+    .videos{grid-template-columns:1fr}
+    .dims{grid-template-columns:1fr}
+    .nav{display:none}
+    h1{font-size:30px}
+    .sec-head{flex-direction:column;align-items:flex-start}
+    .sec-note{text-align:left}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand">
+      <div class="logo">去</div>
+      <div>视频自动去水印工具
+        <small>多智能体流水线 · 检测 → 遮罩 → 修复 → 精修 → 质检</small>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="#replay">回放</a>
+      <a href="#arch">架构</a>
+      <a href="#algo">算法</a>
+      <a href="#numbers">数据</a>
+      <a href="#deploy">本地运行</a>
+      <a class="gh" href="https://github.com/htedot/video-dewatermark" target="_blank" rel="noreferrer">源码 <span aria-hidden="true">↗</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="hero">
+    <div>
+      <span class="eyebrow"><span class="dot"></span>真实运行回放 · 不是模拟动画</span>
+      <h1>把水印从视频里<em>拿掉</em>，<br />而不是贴一层马赛克</h1>
+      <p class="lead">
+        七个 Agent 串成一条流水线：多帧投票找出固定水印，按半透明叠加整框生成遮罩，
+        邻近真实块移植 + 纹理回填完成修复；质检不达标就带着新参数回灌遮罩，重跑到通过为止。
+        全程本地 OpenCV + ffmpeg，视频不上传。
+      </p>
+      <div class="cta">
+        <button class="btn primary" id="heroPlay" type="button">▶ 观看 129 秒流水线回放</button>
+        <a class="btn ghost" href="#deploy">在自己电脑上跑 →</a>
+      </div>
+      <div class="chips">
+        <span class="chip"><b>6</b> 层 DAG</span>
+        <span class="chip"><b>7</b> 个 Agent</span>
+        <span class="chip"><b>2</b> 轮回灌</span>
+        <span class="chip"><b>19</b> 项测试通过</span>
+        <span class="chip">OpenCV 5 · ffmpeg 9</span>
+        <span class="chip"><b>0</b> 次上传</span>
+      </div>
+    </div>
+    <div class="shot">
+      <div class="shot-bar"><i></i><i></i><i></i><span style="margin-left:6px">frame #88 · 3.2× 放大 · 原片 / 成品</span></div>
+      <img src="assets/hero_zoom_text.jpg" alt="同一帧右上角文字水印放大对比：原片有 DEMO © SAMPLE 2024，成品里字迹与底色一起消失、纹理连续" />
+      <div class="shot-cap"><span>同一帧 · 右上角文字水印</span><a href="#numbers">看徽章与关键帧 →</a></div>
+    </div>
+  </div>
+
+  <div class="auth">
+    <div class="ico">⚠</div>
+    <div>
+      <b>授权声明（必读）</b>
+      <p>
+        本工具仅用于处理你本人拥有版权、或已取得权利人明确授权的视频素材，例如清理自己作品的台标与导出残留。
+        禁止用它去除他人作品的水印、台标、版权标识或平台标识 —— 这可能侵犯著作权、违反平台规则并承担法律责任。
+        页面上的演示视频为程序合成的示例素材，不含任何第三方内容。
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================ 回放 ============================ -->
+  <section id="replay">
+    <div class="sec-head">
+      <h2>回放<span>一次真实运行 · 98 条事件 · 129.5 秒</span></h2>
+      <p class="sec-note">
+        视频、日志、评分、产物全部来自本地 8231 服务在 2026-11-11 的真实运行（run <code class="inl">pagedemo01</code>）。
+        页面只按原始时间轴重放这些事件，不做任何美化或补写。
+      </p>
+    </div>
+
+    <div class="replay">
+      <!-- 左：流程 + 日志 -->
+      <div class="card">
+        <div class="panel-head">
+          <span class="t">流水线状态</span>
+          <span class="tag live" id="attemptTag">第 1 轮</span>
+          <span class="spacer"></span>
+          <span class="tag">回灌 REVIEWER → MASK，最多 2 次</span>
+        </div>
+
+        <div class="dag" id="dag">
+          <div class="node" data-node="detector" data-state="idle"><div class="n">检测</div><div class="k">detector</div></div>
+          <div class="node" data-node="mask" data-state="idle"><div class="n">遮罩</div><div class="k">mask</div></div>
+          <div class="node" data-node="inpainter" data-state="idle"><div class="n">修复</div><div class="k">inpainter</div></div>
+          <div class="node" data-node="refiner" data-state="idle"><div class="n">精修</div><div class="k">refiner</div></div>
+          <div class="node" data-node="reviewer" data-state="idle"><div class="n">质检</div><div class="k">reviewer</div></div>
+          <div class="node" data-node="preview" data-state="idle"><div class="n">对比预览</div><div class="k">preview · 并行</div></div>
+          <div class="node" data-node="report" data-state="idle"><div class="n">报告</div><div class="k">report · 并行</div></div>
+        </div>
+
+        <div class="progress-row">
+          <div class="bar"><i id="barFill"></i></div>
+          <span class="pct" id="pctText">0%</span>
+        </div>
+
+        <div class="controls">
+          <button class="mini" id="btnPlay" type="button" style="color:var(--ink);border-color:rgba(45,212,191,.5)">▶ 播放回放</button>
+          <button class="mini" id="btnReset" type="button">↺ 重播</button>
+          <button class="mini" data-speed="1" aria-pressed="false" type="button">1×</button>
+          <button class="mini" data-speed="2" aria-pressed="true" type="button">2×</button>
+          <button class="mini" data-speed="4" aria-pressed="false" type="button">4×</button>
+          <button class="mini" id="btnCompact" aria-pressed="true" type="button">精简进度日志</button>
+          <span class="clock mono" id="clock">00:00.0 / 02:09.5</span>
+        </div>
+
+        <div class="log" id="log">
+          <div class="ln"><span class="ts">00:00.0</span><span class="msg muted">按「播放回放」开始；日志、节点状态、进度条都会跟着真实事件走。</span></div>
+        </div>
+      </div>
+
+      <!-- 右：视频 + 分数 -->
+      <div class="card">
+        <div class="panel-head"><span class="t">原片 / 成品</span><span class="spacer"></span><span class="tag" id="syncTag">同步播放</span></div>
+        <div class="videos">
+          <div class="vwrap">
+            <video id="vSrc" src="assets/source.mp4" muted loop playsinline preload="metadata"></video>
+            <div class="vlabel"><b>原片</b><span>1280×720 · 6s · 有音轨</span></div>
+          </div>
+          <div class="vwrap">
+            <video id="vClean" src="assets/clean.mp4" muted loop playsinline preload="metadata"></video>
+            <div class="vlabel"><b>成品</b><span class="badge-live">水印已移除</span></div>
+          </div>
+        </div>
+
+        <div class="scorecard">
+          <div class="score-top">
+            <div class="ring" id="ring" style="--p:0"><div class="val"><b id="scoreVal">—</b><small>/ 100</small></div></div>
+            <div>
+              <span class="verdict" id="verdict">等待回放结束</span>
+              <div class="kvs">
+                <span>通过线 <b>75</b></span>
+                <span>轮次 <b>2</b></span>
+                <span>回灌 <b>1</b> 次</span>
+                <span>抽检 <b>5</b> 帧</span>
+              </div>
+              <div class="kvs"><span class="muted">四维加权：纹理 0.35 · 边缘 0.30 · 色彩 0.20 · 自然度 0.15</span></div>
+            </div>
+          </div>
+
+          <div class="dims" id="dims"></div>
+
+          <div class="failbox" id="failbox" hidden>
+            <b>第 1 轮为什么不达标</b>
+            <ul id="failList"></ul>
+          </div>
+
+          <div class="quote" id="comment">—</div>
+
+          <div class="links">
+            <a class="btn ghost" href="assets/review_report.json" download>下载 review_report.json</a>
+            <a class="btn ghost" href="assets/detect_report.json" download>下载 detect_report.json</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:16px">
+      <div class="card pad">
+        <h3>检测结果 · 2 个区域</h3>
+        <p class="small muted" style="margin:0 0 10px">
+          48 帧多帧投票，出现率阈值 0.70；工作分辨率 960×540（缩放 0.75）。
+        </p>
+        <table>
+          <thead><tr><th>区域</th><th>bbox（原分辨率）</th><th>类型</th><th>出现率</th><th>置信度</th></tr></thead>
+          <tbody id="detTable"></tbody>
+        </table>
+      </div>
+      <div class="card pad">
+        <h3>遮罩 · 半透明叠加判定</h3>
+        <p class="small muted" style="margin:0 0 10px">
+          框内时间方差 / 邻域环形方差 &lt; 0.85 判定为半透明叠加层，直接整框覆盖，避免只盖笔画留下淡影。
+        </p>
+        <table>
+          <thead><tr><th>区域</th><th>衰减比</th><th>遮罩 bbox</th><th>覆盖</th><th>策略</th></tr></thead>
+          <tbody id="maskTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 不能在线跑 ============================ -->
+  <section id="why">
+    <div class="sec-head">
+      <h2>为什么这页只能看回放<span>GitHub Pages 是静态托管</span></h2>
+      <p class="sec-note">它只发送 HTML/JS/图片，不执行 Python，也跑不了 OpenCV 与 ffmpeg。真正的处理在你自己的机器上完成。</p>
+    </div>
+    <div class="grid3">
+      <div class="card pad">
+        <h3>① 本地运行（推荐）</h3>
+        <p class="small muted">
+          双击 <code class="inl">start.bat</code>，浏览器打开 <code class="inl">127.0.0.1:8231</code>。
+          全部计算在本机，视频不出硬盘，没有上传带宽与排队。
+        </p>
+      </div>
+      <div class="card pad">
+        <h3>② 内网穿透</h3>
+        <p class="small muted">
+          想用手机或外网访问，把本地端口挂到临时域名即可：
+          <code class="inl">cloudflared tunnel --url http://127.0.0.1:8231</code>。
+          服务仍是你的机器在算。
+        </p>
+      </div>
+      <div class="card pad">
+        <h3>③ 云服务器</h3>
+        <p class="small muted">
+          有常驻需求时，把 <code class="inl">runtime/</code> 与项目一起放到有 Python 3.13 的机器上，
+          用 start.bat 或进程守护跑 <code class="inl">backend/main.py</code> 即可。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 架构 ============================ -->
+  <section id="arch">
+    <div class="sec-head">
+      <h2>架构<span>6 层 DAG · 7 个 Agent · 1 条回灌边</span></h2>
+      <p class="sec-note">Agent 只实现 <code class="inl">run(payload) -&gt; payload</code>，彼此不 import；编排、事件、超时由 orchestrator 统一负责。</p>
+    </div>
+
+    <div class="flow">
+      <div class="layer"><div class="no">层 1</div><div class="cells">
+        <div class="acell"><div class="an">检测 Agent <span>detector · 1.08s</span></div><div class="ad">抽 48 帧 → 中位帧 Canny ∩ 多帧投票 → 连通域 → 置信度排序，输出 bbox / 置信度 / 类型。</div></div>
+      </div></div>
+      <div class="layer"><div class="no">层 2</div><div class="cells">
+        <div class="acell"><div class="an">遮罩 Agent <span>mask · 0.02s</span></div><div class="ad">按框取笔画 → 填洞 → 膨胀 → 高斯羽化；判定为半透明叠加时整框覆盖。回灌时按新参数重建。</div></div>
+      </div></div>
+      <div class="layer"><div class="no">层 3</div><div class="cells">
+        <div class="acell"><div class="an">修复 Agent <span>inpainter · 14.9s / 44.1s</span></div><div class="ad">cv2.inpaint（Telea / NS）+ 邻近真实块移植 + 纹理回填，rawvideo 管道直接喂 ffmpeg 编 H.264 并保留音轨。</div></div>
+      </div></div>
+      <div class="layer"><div class="no">层 4</div><div class="cells">
+        <div class="acell"><div class="an">精修 Agent <span>refiner · 29.1s / 43.8s</span></div><div class="ad">比对修复区与邻域的纹理方差和边缘密度，分出 edge_residual / over_smooth，只对问题区域换参数重修。</div></div>
+      </div></div>
+      <div class="layer"><div class="no">层 5</div><div class="cells">
+        <div class="acell"><div class="an">质检 Agent <span>reviewer · 0.51s</span></div><div class="ad">抽 5 帧量纹理方差比、边缘密度比、亮度差；中位数 + 帧通过率聚合，四维加权打分，出人眼可查的对比图。</div></div>
+      </div></div>
+      <div class="layer"><div class="no">层 6</div><div class="cells">
+        <div class="acell"><div class="an">对比预览 <span>preview · 并行</span></div><div class="ad">3 帧原片（画检测框）与成品并排，生成一张对比大图。</div></div>
+        <div class="acell"><div class="an">报告 <span>report · 并行</span></div><div class="ad">落盘 detect_report.json / review_report.json / run_log.json，记录参数、指标、逐步耗时。</div></div>
+      </div></div>
+    </div>
+
+    <div class="fbline">
+      <span class="mono">reviewer → mask</span>
+      <span>不达标时不重跑整条链，而是带着下一档参数（method / radius / blur_mix / feather / dilate / ink / pad + 逐区域覆盖）回到遮罩层，最多 2 次。</span>
+    </div>
+  </section>
+
+  <!-- ============================ 算法 ============================ -->
+  <section id="algo">
+    <div class="sec-head">
+      <h2>六个不显然的工程决定<span>每一个都由失败实验换来的</span></h2>
+      <p class="sec-note">下面这些不是"为了显得高级"，而是把水印去干净必须跨过的坑。</p>
+    </div>
+
+    <div class="grid3 algo">
+      <div class="card pad">
+        <h3><span class="n">01</span>用中位帧边缘当种子</h3>
+        <p>直接对多帧投票图取 <code class="inl">support ≥ 0.7</code> 会得到 <b>133 个连通域</b>：运动残影、周期性纹理都会被投票堆起来。
+          改成「<b>中位帧 Canny ∩ 投票</b>」后同一段素材稳定出 <b>2 个</b>真实水印框，出现率仍按种子像素统计。</p>
+        <div class="metric">候选连通域 133 → 2 · 干净率 100%</div>
+      </div>
+      <div class="card pad">
+        <h3><span class="n">02</span>半透明叠加要整框盖</h3>
+        <p>只盖笔画会在原处留下<b>淡白残影</b>：半透明层会把整块区域的时间方差压低。
+          用「框内时间方差 / 邻域方差」当衰减指标，&lt; 0.85 就判定为叠加层，整框覆盖并额外膨胀。</p>
+        <div class="metric">attenuation 0.56 / 0.68 → 整框 · coverage 3.63%</div>
+      </div>
+      <div class="card pad">
+        <h3><span class="n">03</span>邻近真实块移植</h3>
+        <p>cv2.inpaint 只会扩散颜色，纹理必然丢：修复区方差掉到邻域的 1/3，边缘密度接近 0，看起来像一块<b>磨皮斑</b>。
+          改为在 8 个方向上找边缘统计最接近的源块，做均值对齐后羽化贴回。</p>
+        <div class="metric">patch offset c2[279,0] c1[0,52] · 180/180 帧生效</div>
+      </div>
+      <div class="card pad">
+        <h3><span class="n">04</span>纹理回填要按需补</h3>
+        <p>移植后高频仍可能不足，用环带高频方差反解增益：
+          <code class="inl">var_base + s²·var_field = var_ring</code>，只补差额、设上限，避免把画面补成噪点。</p>
+        <div class="metric">tex_ratio 0.78 → 0.144（第 2 轮，阈值 0.3）</div>
+      </div>
+      <div class="card pad">
+        <h3><span class="n">05</span>判据换成高频纹理方差</h3>
+        <p>整块方差被背景渐变与运动物体主导，同一帧能差 3 倍。<b>高频分量方差</b>才反映"修复区有没有纹理"；
+          再用 5 帧中位数 + 帧通过率聚合，避免一帧被遮挡就判死。</p>
+        <div class="metric">c2 5/5 帧、c1 4/5 帧达标 · 中位数判定</div>
+      </div>
+      <div class="card pad">
+        <h3><span class="n">06</span>增量只在回灌时启用</h3>
+        <p>第 1 轮只跑任务书 baseline（纯 inpaint，快）；判不达标才上移植 + 回填。
+          既省时，也让「不达标 → 重生成 → 达标」这条链路在日志里真实可见。</p>
+        <div class="metric">第 1 轮 47.12 → 第 2 轮 76.70</div>
+      </div>
+    </div>
+
+    <div class="card pad" style="margin-top:16px">
+      <h3>回灌参数梯度（节选）</h3>
+      <table>
+        <thead>
+          <tr><th>轮次</th><th>method / radius</th><th>blur_mix</th><th>feather σ</th><th>dilate</th><th>ink</th><th>patch / texture</th><th>结果</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>尝试 1</td><td class="mono">telea / 5</td><td class="mono">0.00</td><td class="mono">7</td><td class="mono">2</td><td class="mono">0.50</td><td class="mono">关 / 关</td><td style="color:var(--red)">47.12 不达标</td></tr>
+          <tr><td>尝试 2</td><td class="mono">ns / 8</td><td class="mono">0.25</td><td class="mono">9</td><td class="mono">4</td><td class="mono">0.45</td><td class="mono">开 / 开</td><td style="color:var(--green)">76.70 通过</td></tr>
+          <tr><td>逐区域覆盖</td><td class="mono">telea / 4</td><td class="mono">0.00</td><td class="mono">—</td><td class="mono">0</td><td class="mono">0.60</td><td class="mono">—</td><td class="muted">over_smooth 区域</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================ 数据 ============================ -->
+  <section id="numbers">
+    <div class="sec-head">
+      <h2>这一跑的数字<span>全部可在报告里复查</span></h2>
+      <p class="sec-note">没有手写的美化数字：分数、耗时、产物清单都来自 <code class="inl">review_report.json</code> 与 <code class="inl">run_log.json</code>。</p>
+    </div>
+    <div class="stats">
+      <div class="stat teal"><b>129.5s</b><span>端到端耗时</span><span class="sub">2 轮 · 180 帧 · 1280×720</span></div>
+      <div class="stat green"><b>76.7</b><span>最终质检分</span><span class="sub">通过线 75 · 第 1 轮 47.12</span></div>
+      <div class="stat amber"><b>0.144</b><span>最差纹理方差比</span><span class="sub">阈值 0.3 · 5/5 帧达标</span></div>
+      <div class="stat blue"><b>19</b><span>产物文件</span><span class="sub">含两轮中间视频与 5 帧对比图</span></div>
+    </div>
+
+    <div class="grid2" style="margin-top:16px">
+      <div class="card pad">
+        <h3>四维得分</h3>
+        <div class="dims" id="dims2" style="margin-bottom:0"></div>
+      </div>
+      <div class="card pad">
+        <h3>工程化约束</h3>
+        <ul class="clean">
+          <li><b>19 项自动测试</b>：17 项契约（SSE 格式、JSON 平衡括号解析、Agent 不互相 import、DAG 层数、端口区间、.bat 编码…）+ 2 项端到端（落盘 + 质检通过）。</li>
+          <li><b>超时与降级</b>：LLM 90s、ffprobe 60s、ffmpeg 编码 180s、示例生成 120s，全部有超时；没有 Key 时三个 LLM 触点规则化降级。</li>
+          <li><b>本地产物</b>：<code class="inl">outputs/&lt;run_id&gt;/clean.mp4</code> + <code class="inl">detect_report.json</code> + <code class="inl">review_report.json</code>，每轮中间视频单独留档。</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin:22px 0 10px">关键帧与中间产物</h3>
+    <div class="gallery">
+      <figure class="span3"><img src="assets/preview_before_after.jpg" alt="3 帧原片与成品并排对比：两处水印在成品中消失" loading="lazy" /><figcaption>preview_before_after.jpg · 3 帧原片 / 成品</figcaption></figure>
+      <figure><img src="assets/hero_zoom_badge.jpg" alt="左下角半透明徽章 2.6 倍放大对比：原片有 PREVIEW 徽章，成品中整块被邻域纹理替换" loading="lazy" /><figcaption>徽章 · 2.6× 原片 / 成品</figcaption></figure>
+      <figure><img src="assets/mask_overlay.jpg" alt="遮罩覆盖在原始帧上：两个水印区域被整框标红" loading="lazy" /><figcaption>mask_overlay.jpg · 整框遮罩</figcaption></figure>
+      <figure><img src="assets/montage.jpg" alt="5 帧质检对比拼图：每帧逐区域原片与修复后并排" loading="lazy" /><figcaption>review_frames/montage.jpg · 5 帧质检</figcaption></figure>
+      <figure><img src="assets/detect_preview.jpg" alt="检测框标定结果：右上文字与左下徽章被框出" loading="lazy" /><figcaption>detect_preview.jpg</figcaption></figure>
+      <figure><img src="assets/detect_support.jpg" alt="多帧投票支持度热力图" loading="lazy" /><figcaption>detect_support.jpg</figcaption></figure>
+      <figure><img src="assets/frame_01.jpg" alt="质检帧 1：原片与修复后并排" loading="lazy" /><figcaption>review_frames/frame_01.jpg</figcaption></figure>
+      <figure><img src="assets/frame_02.jpg" alt="质检帧 2" loading="lazy" /><figcaption>review_frames/frame_02.jpg</figcaption></figure>
+      <figure><img src="assets/frame_03.jpg" alt="质检帧 3" loading="lazy" /><figcaption>review_frames/frame_03.jpg</figcaption></figure>
+      <figure><img src="assets/frame_04.jpg" alt="质检帧 4" loading="lazy" /><figcaption>review_frames/frame_04.jpg</figcaption></figure>
+      <figure><img src="assets/frame_05.jpg" alt="质检帧 5" loading="lazy" /><figcaption>review_frames/frame_05.jpg</figcaption></figure>
+    </div>
+  </section>
+
+  <!-- ============================ 本地运行 ============================ -->
+  <section id="deploy">
+    <div class="sec-head">
+      <h2>在自己电脑上跑<span>Python 3.13 + OpenCV + ffmpeg</span></h2>
+      <p class="sec-note">整个项目不带 venv、不联网推理：runtime 目录里就是解释器与 ffmpeg，双击即用。</p>
+    </div>
+
+    <div class="deploy">
+      <div class="card pad">
+        <h3>三步启动</h3>
+        <div class="step">
+          <div class="i">1</div>
+          <div>
+            <p>拿到源码与 runtime（解释器 + ffmpeg）后，目录结构：</p>
+<pre>video_dewatermark/
+  start.bat  stop.bat  run_tests.bat
+  backend/   main.py  agents/  data/
+  tests/
+runtime/
+  python/python.exe
+  ffmpeg/ffmpeg.exe  ffmpeg/ffprobe.exe</pre>
+          </div>
+        </div>
+        <div class="step">
+          <div class="i">2</div>
+          <div>
+            <p>双击 <code class="inl">start.bat</code>：检查端口 8231 → 后台起服务 → 探活 → 自动开浏览器。</p>
+            <pre><span class="c">:: 也可以命令行启动</span>
+start.bat
+<span class="c">:: 停止</span>
+stop.bat</pre>
+          </div>
+        </div>
+        <div class="step">
+          <div class="i">3</div>
+          <div>
+            <p>页面里勾选授权声明 → 选视频（上传 / 服务器路径 / 内置示例）→ 调参数 → 开始。右侧 SSE 日志实时滚动。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card pad">
+        <h3>可选：接上大模型</h3>
+        <p class="small muted" style="margin-top:0">
+          默认规则模式即可完成全部处理。想启用"参数建议 / 人眼评语"，在 <code class="inl">backend/.env</code> 填 Key 后重启：
+        </p>
+<pre><span class="c"># backend/.env</span>
+DEEPSEEK_API_KEY=<span class="s">sk-...</span>
+DEEPSEEK_MODEL=<span class="s">deepseek-chat</span>
+LLM_TIMEOUT=<span class="s">90</span></pre>
+        <p class="small muted">
+          三个 LLM 触点都只做"在允许集合里选参数 / 写评语"，且带超时与失败降级；
+          输出必须过平衡括号解析与白名单校验，越界即回落规则值。模型不接触像素。
+        </p>
+        <h3 style="margin-top:16px">API</h3>
+        <table>
+          <tbody>
+            <tr><td class="mono">GET /api/health</td><td>服务 / ffmpeg / LLM 状态</td></tr>
+            <tr><td class="mono">GET /api/dag</td><td>层、节点、回灌边</td></tr>
+            <tr><td class="mono">GET /api/events?run_id=</td><td>SSE 事件流（先订阅再提交）</td></tr>
+            <tr><td class="mono">POST /api/generate</td><td>提交任务（authorized 必须为 true）</td></tr>
+            <tr><td class="mono">GET /api/runs/{id}</td><td>结果、报告、产物</td></tr>
+            <tr><td class="mono">GET /api/runs/{id}/video</td><td>成品 clean.mp4</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card pad" style="margin-top:16px">
+      <h3>测试</h3>
+<pre><span class="c">:: 19 项：17 契约 + 2 端到端（约 65 秒 / 端到端各一条）</span>
+run_tests.bat
+
+<span class="c">:: 端到端会真的跑一遍：造带音轨样本 → 流水线 → 断言产物落盘、质检通过、回灌日志存在</span></pre>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap foot-in" style="padding:0">
+      <div>
+        <b style="color:var(--ink)">视频自动去水印工具</b> · 多智能体 Web 服务 · OpenCV 5 / FastAPI / ffmpeg
+        <div class="small" style="margin-top:4px">仅限授权内容使用 · 检测与修复全部在本地完成，视频不上传 · 页面为真实产物回放</div>
+      </div>
+      <div class="small">
+        <a href="https://github.com/htedot/video-dewatermark" target="_blank" rel="noreferrer">GitHub 源码</a>
+        &nbsp;·&nbsp; <a href="https://github.com/htedot/video-dewatermark/tree/main/source" target="_blank" rel="noreferrer">下载项目</a>
+        &nbsp;·&nbsp; <span class="mono">run pagedemo01</span>
+      </div>
+    </div>
+  </footer>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var logEl = $("log"), barFill = $("barFill"), pctText = $("pctText"), clockEl = $("clock");
+  var btnPlay = $("btnPlay"), btnReset = $("btnReset"), attemptTag = $("attemptTag");
+  var vSrc = $("vSrc"), vClean = $("vClean");
+
+  var run = null;
+  var playing = false, timer = null, idx = 0, speed = 2, compact = true;
+  var total = 0, attempt = 1, percent = 0;
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function fmt(sec) {
+    if (sec < 0) sec = 0;
+    var m = Math.floor(sec / 60), s = sec - m * 60;
+    return pad(m) + ":" + (s < 10 ? "0" : "") + s.toFixed(1);
+  }
+  function esc(text) {
+    return String(text == null ? "" : text).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  /* ---------------- render static data ---------------- */
+  function renderDetect() {
+    var rows = (run.detect_regions || []).map(function (r) {
+      return "<tr><td class='mono'>" + esc(r.id) + "</td><td class='mono'>[" + r.bbox.join(", ") + "]</td><td>" +
+        esc(r.kind) + "</td><td class='mono'>" + r.appear_rate.toFixed(3) + "</td><td class='mono'>" + r.confidence.toFixed(3) + "</td></tr>";
+    }).join("");
+    $("detTable").innerHTML = rows;
+  }
+
+  function renderMask() {
+    var regions = (run.mask && run.mask.regions) || [];
+    var rows = regions.map(function (r) {
+      return "<tr><td class='mono'>" + esc(r.id) + "</td><td class='mono'>" + r.attenuation.toFixed(2) +
+        "</td><td class='mono'>[" + r.bbox.join(", ") + "]</td><td class='mono'>" +
+        (run.mask.coverage * 100).toFixed(2) + "%</td><td>" + (r.attenuated ? "整框覆盖" : "仅笔画") + "</td></tr>";
+    }).join("");
+    $("maskTable").innerHTML = rows;
+  }
+
+  function renderDims() {
+    var dims = run.review.dimensions || {};
+    var order = ["texture", "edge", "color", "natural"];
+    var html = order.filter(function (k) { return dims[k]; }).map(function (k) {
+      var d = dims[k], p = Math.max(0, Math.min(100, d.score));
+      return "<div class='dim'><div class='row'><span>" + esc(d.label) + " <span class='muted'>· 权重 " + d.weight +
+        "</span></span><b class='mono'>" + d.score.toFixed(2) + "</b></div>" +
+        "<div class='track'><i style='width:" + p + "%'></i></div>" +
+        "<div class='det'>" + esc(d.detail) + "</div></div>";
+    }).join("");
+    $("dims").innerHTML = html;
+    $("dims2").innerHTML = html;
+  }
+
+  function renderFinalScore() {
+    var score = run.review.score || 0;
+    $("scoreVal").textContent = score.toFixed(1);
+    $("ring").style.setProperty("--p", String(Math.max(0, Math.min(100, score))));
+    var v = $("verdict");
+    v.textContent = "质检通过 · 第 2 轮";
+    v.style.color = "var(--green)";
+    $("comment").textContent = run.review.comment || "";
+  }
+
+  /* ---------------- replay engine ---------------- */
+  function setNode(key, state) {
+    var el = document.querySelector('.node[data-node="' + key + '"]');
+    if (el) el.setAttribute("data-state", state);
+  }
+  function resetNodes() {
+    Array.prototype.forEach.call(document.querySelectorAll(".node"), function (el) {
+      el.setAttribute("data-state", "idle");
+    });
+  }
+  function setPct(v) {
+    percent = Math.max(percent, Math.min(100, v || 0));
+    barFill.style.width = percent + "%";
+    pctText.textContent = Math.round(percent) + "%";
+  }
+
+  function logLine(evt, kind) {
+    if (compact && evt.type === "agent_progress" && (evt.data.percent || 0) % 25 !== 0) {
+      /* 精简模式：只留 0/25/50/75/100 这类节点进度，避免刷屏 */
+      if (evt.data.percent !== 15 && evt.data.percent !== 45 && evt.data.percent !== 85) return;
+    }
+    var agent = evt.data && evt.data.label ? "[" + evt.data.label.replace(" Agent", "") + "] " : "";
+    var div = document.createElement("div");
+    div.className = "ln";
+    div.setAttribute("data-k", kind || "");
+    div.innerHTML = "<span class='ts'>" + fmt(evt.t) + "</span><span class='msg'><span class='agent'>" +
+      esc(agent) + "</span>" + esc(evt.message) + "</span>";
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function handle(evt) {
+    var d = evt.data || {};
+    switch (evt.type) {
+      case "task_queued":
+        logLine(evt); break;
+      case "task_started":
+        logLine(evt, "start"); setPct(3); break;
+      case "agent_started":
+        setNode(d.agent, "running"); logLine(evt, "start"); break;
+      case "agent_progress":
+        setNode(d.agent, "running");
+        if (typeof d.percent === "number" && d.agent === "detector") setPct(Math.max(percent, 6 + d.percent * 0.12));
+        logLine(evt); break;
+      case "agent_completed":
+        setNode(d.agent, "done"); logLine(evt, "done");
+        setPct(10 + (["detector", "mask", "inpainter", "refiner", "reviewer", "preview", "report"].indexOf(d.agent) + 1) * 11);
+        break;
+      case "llm_call":
+        logLine(evt, "llm"); break;
+      case "parallel_started":
+        (d.nodes || d.agents || []).forEach(function (a) { setNode(a, "running"); });
+        logLine(evt, "start"); break;
+      case "parallel_completed":
+        (d.nodes || d.agents || []).forEach(function (a) { setNode(a, "done"); });
+        logLine(evt, "done"); break;
+      case "review_feedback":
+        attempt = d.attempt || attempt + 1;
+        attemptTag.textContent = "第 " + attempt + " 轮";
+        ["mask", "inpainter", "refiner", "reviewer"].forEach(function (k) { setNode(k, "idle"); });
+        setPct(38);
+        logLine(evt, "fb");
+        if (d.failures && d.failures.length) {
+          $("failbox").hidden = false;
+          $("failList").innerHTML = d.failures.map(function (f) { return "<li>" + esc(f) + "</li>"; }).join("");
+        }
+        break;
+      case "task_completed":
+        logLine(evt, "end");
+        setPct(100);
+        renderFinalScore();
+        $("comment").classList.add("reveal");
+        stopVideos();
+        finish();
+        break;
+      case "task_failed":
+        logLine(evt, "fb"); finish(); break;
+      default:
+        logLine(evt);
+    }
+  }
+
+  function step() {
+    if (!playing) return;
+    if (idx >= run.events.length) { finish(); return; }
+    var evt = run.events[idx];
+    var prev = idx > 0 ? run.events[idx - 1].t : 0;
+    var gap = Math.max(0, evt.t - prev);
+    handle(evt);
+    clockEl.textContent = fmt(evt.t) + " / " + fmt(total);
+    idx += 1;
+    var delay = Math.min(90 + gap * 45, 520) / speed;
+    timer = setTimeout(step, delay);
+  }
+
+  function finish() {
+    playing = false;
+    clearTimeout(timer);
+    btnPlay.textContent = "▶ 重播";
+    clockEl.textContent = fmt(total) + " / " + fmt(total);
+  }
+
+  function startVideos() {
+    try {
+      vSrc.currentTime = 0.2; vClean.currentTime = 0.2;
+      var p1 = vSrc.play(), p2 = vClean.play();
+      if (p1 && p1.catch) p1.catch(function () {});
+      if (p2 && p2.catch) p2.catch(function () {});
+    } catch (e) { /* autoplay 被拦时忽略 */ }
+  }
+  function stopVideos() {
+    try { vSrc.pause(); vClean.pause(); } catch (e) {}
+  }
+
+  function reset() {
+    clearTimeout(timer); playing = false; idx = 0; percent = 0; attempt = 1;
+    resetNodes(); setPct(0); attemptTag.textContent = "第 1 轮";
+    logEl.innerHTML = "";
+    $("failbox").hidden = true; $("failList").innerHTML = "";
+    $("scoreVal").textContent = "—";
+    $("ring").style.setProperty("--p", "0");
+    var v = $("verdict");
+    v.textContent = "等待回放结束"; v.style.color = "var(--teal)";
+    $("comment").textContent = "—"; $("comment").classList.remove("reveal");
+    btnPlay.textContent = "▶ 播放回放";
+    clockEl.textContent = "00:00.0 / " + fmt(total);
+    stopVideos();
+    try { vSrc.currentTime = 0; vClean.currentTime = 0; } catch (e) {}
+  }
+
+  function togglePlay() {
+    if (!run) return;
+    if (playing) {
+      playing = false; clearTimeout(timer); btnPlay.textContent = "▶ 继续";
+      stopVideos();
+      return;
+    }
+    if (idx >= run.events.length) reset();
+    playing = true;
+    btnPlay.textContent = "⏸ 暂停";
+    startVideos();
+    step();
+  }
+
+  function boot() {
+    total = run.events.length ? run.events[run.events.length - 1].t : 0;
+    renderDetect(); renderMask(); renderDims();
+    reset();
+    $("btnCompact").setAttribute("aria-pressed", String(compact));
+    btnPlay.addEventListener("click", togglePlay);
+    btnReset.addEventListener("click", function () { reset(); });
+    $("heroPlay").addEventListener("click", function () {
+      document.getElementById("replay").scrollIntoView({ behavior: "smooth", block: "start" });
+      if (!playing && idx === 0) setTimeout(togglePlay, 420);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-speed]"), function (b) {
+      b.addEventListener("click", function () {
+        speed = Number(b.getAttribute("data-speed"));
+        Array.prototype.forEach.call(document.querySelectorAll("[data-speed]"), function (x) {
+          x.setAttribute("aria-pressed", String(x === b));
+        });
+      });
+    });
+    $("btnCompact").addEventListener("click", function () {
+      compact = !compact;
+      $("btnCompact").setAttribute("aria-pressed", String(compact));
+      $("btnCompact").textContent = compact ? "精简进度日志" : "完整日志";
+    });
+  }
+
+  fetch("assets/run.json").then(function (r) {
+    if (!r.ok) throw new Error("run.json " + r.status);
+    return r.json();
+  }).then(function (data) { run = data; boot(); }).catch(function (err) {
+    logEl.innerHTML = "<div class='ln'><span class='ts'>!</span><span class='msg'>加载 run.json 失败：" +
+      esc(err.message) + "</span></div>";
+  });
+})();
+</script>
+</body>
+</html>

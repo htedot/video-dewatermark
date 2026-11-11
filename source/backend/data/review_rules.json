@@ -1,0 +1,68 @@
+{
+  "name": "review_rules",
+  "version": 1,
+  "description": "质检规则库：抽帧数、维度权重、阈值、判定与回灌策略。全部可调，改这里不用改代码。",
+  "frames": 5,
+  "thresholds": {
+    "tex_ratio": 0.3,
+    "var_ratio": 0.3,
+    "edge_ratio_min": 0.35,
+    "edge_ratio_max": 1.8,
+    "lum_diff": 0.9,
+    "pass_score": 75,
+    "edge_ring_floor": 0.02,
+    "min_frame_pass_ratio": 0.6
+  },
+  "metric_note": "判定用 tex_ratio：修复区/邻域**高频纹理方差**的相对偏差，阈值 0.3（对应任务书的「修复区方差 − 邻域方差」）。var_ratio 保留为诊断值：它把背景大尺度渐变也算进去，同一块区域在缓变背景上方差能差几倍，不适合当判据。",
+  "aggregation": {
+    "method": "median",
+    "why": "同一区域逐帧指标会受运动物体穿过环带影响而抖动，用 5 帧中位数判定更稳；同时要求至少 min_frame_pass_ratio 的帧单帧也达标，避免中位数掩盖系统性问题。"
+  },
+  "dimensions": [
+    {
+      "key": "texture",
+      "label": "纹理一致性",
+      "weight": 0.35,
+      "metric": "var_ratio",
+      "desc": "修复区方差与邻域环带方差的相对偏差，越小越像同一块纹理"
+    },
+    {
+      "key": "edge",
+      "label": "边缘残留",
+      "weight": 0.3,
+      "metric": "edge_ratio",
+      "desc": "修复区边缘密度 / 邻域边缘密度；>1.8 说明水印边缘还在，<0.35 说明被修糊"
+    },
+    {
+      "key": "color",
+      "label": "色彩/亮度连续性",
+      "weight": 0.2,
+      "metric": "lum_diff",
+      "desc": "修复区与邻域的平均亮度差（以邻域标准差归一化）"
+    },
+    {
+      "key": "natural",
+      "label": "整体自然度",
+      "weight": 0.15,
+      "metric": "rule_or_llm",
+      "desc": "规则：上述三项的加权几何平均；LLM 可用时给一段人眼判断并微调该项"
+    }
+  ],
+  "verdicts": {
+    "pass": "达标",
+    "fail": "不达标"
+  },
+  "feedback": {
+    "max_retries": 2,
+    "escalate": [
+      "加厚 mask（dilate_extra↑ / ink_threshold↓）覆盖半透明残余",
+      "换 NS 或增大 radius，减少拉伸状伪纹理",
+      "按 blur_mix 掺入局部模糊，平滑掉高频残迹"
+    ],
+    "notes": "同一区域连续两次判 fail 时强制走 grid 最后一档（更激进），避免死循环。"
+  },
+  "human_check": {
+    "instruction": "抽 5 帧人工评分点：每帧给出「原图 | 修复后」并排切片，人眼看是否有修痕、色块、拖影。",
+    "scale": "1-5 分（5=完全看不出），低于 4 分视为人工不通过"
+  }
+}

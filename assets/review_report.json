@@ -1,0 +1,297 @@
+{
+  "run_id": "pagedemo01",
+  "generated_at": "2026-11-11 16:46:45",
+  "passed": true,
+  "verdict": "pass",
+  "score": 76.7,
+  "pass_score": 75.0,
+  "attempts": 2,
+  "feedback_count": 1,
+  "thresholds": {
+    "tex_ratio": 0.3,
+    "var_ratio": 0.3,
+    "edge_ratio_min": 0.35,
+    "edge_ratio_max": 1.8,
+    "lum_diff": 0.9,
+    "pass_score": 75,
+    "edge_ring_floor": 0.02,
+    "min_frame_pass_ratio": 0.6
+  },
+  "dimensions": {
+    "texture": {
+      "label": "纹理一致性",
+      "score": 52.13,
+      "weight": 0.35,
+      "detail": "最差区域纹理方差差 0.144（阈值 0.3）"
+    },
+    "edge": {
+      "label": "边缘残留",
+      "score": 100.0,
+      "weight": 0.3,
+      "detail": "边缘密度比 1.00~1.00（合格区间 0.35~1.8）"
+    },
+    "color": {
+      "label": "色彩/亮度连续性",
+      "score": 85.09,
+      "weight": 0.2,
+      "detail": "最大亮度差 0.134（阈值 0.9）"
+    },
+    "natural": {
+      "label": "整体自然度",
+      "score": 76.27,
+      "weight": 0.15,
+      "detail": "规则：三维几何平均；有 LLM 时与模型评分各占一半"
+    }
+  },
+  "regions": [
+    {
+      "id": "c2",
+      "bbox": [
+        9,
+        614,
+        239,
+        81
+      ],
+      "samples": 5,
+      "tex_ratio": 0.1117,
+      "tex_ratio_mean": 0.1033,
+      "tex_ratio_max": 0.1328,
+      "tex_ratio_min": 0.0513,
+      "tex_in": 224.36,
+      "tex_ring": 236.09,
+      "var_ratio": 0.0911,
+      "var_ratio_max": 0.2094,
+      "edge_ratio": 0.678,
+      "edge_ratio_mean": 0.9012,
+      "edge_ratio_max": 1.9076,
+      "edge_ratio_min": 0.3123,
+      "edge_ring": 0.01373,
+      "edge_exempt": true,
+      "lum_diff": 0.1342,
+      "var_in": 329.75,
+      "var_ring": 371.89,
+      "pass_frames": 5,
+      "frame_pass_ratio": 1.0
+    },
+    {
+      "id": "c1",
+      "bbox": [
+        876,
+        29,
+        403,
+        35
+      ],
+      "samples": 5,
+      "tex_ratio": 0.1436,
+      "tex_ratio_mean": 0.1473,
+      "tex_ratio_max": 0.3579,
+      "tex_ratio_min": 0.0145,
+      "tex_in": 224.65,
+      "tex_ring": 221.45,
+      "var_ratio": 0.1029,
+      "var_ratio_max": 0.6777,
+      "edge_ratio": 0.8684,
+      "edge_ratio_mean": 0.9647,
+      "edge_ratio_max": 1.6404,
+      "edge_ratio_min": 0.278,
+      "edge_ring": 0.01468,
+      "edge_exempt": true,
+      "lum_diff": 0.1157,
+      "var_in": 326.89,
+      "var_ring": 340.27,
+      "pass_frames": 4,
+      "frame_pass_ratio": 0.8
+    }
+  ],
+  "frames": [
+    {
+      "index": 8,
+      "metrics": [
+        {
+          "var_in": 373.21,
+          "var_ring": 365.34,
+          "var_ratio": 0.0215,
+          "tex_in": 238.86,
+          "tex_ring": 227.2,
+          "tex_ratio": 0.0513,
+          "edge_in": 0.00811,
+          "edge_ring": 0.0125,
+          "edge_ratio": 0.649,
+          "lum_diff": 0.1342
+        },
+        {
+          "var_in": 365.73,
+          "var_ring": 1134.68,
+          "var_ratio": 0.6777,
+          "tex_in": 289.59,
+          "tex_ring": 451.03,
+          "tex_ratio": 0.3579,
+          "edge_in": 0.04353,
+          "edge_ring": 0.02654,
+          "edge_ratio": 1.6404,
+          "lum_diff": 0.0384
+        }
+      ]
+    },
+    {
+      "index": 48,
+      "metrics": [
+        {
+          "var_in": 395.16,
+          "var_ring": 371.89,
+          "var_ratio": 0.0626,
+          "tex_in": 267.45,
+          "tex_ring": 236.09,
+          "tex_ratio": 0.1328,
+          "edge_in": 0.01359,
+          "edge_ring": 0.01417,
+          "edge_ratio": 0.959,
+          "lum_diff": 0.0303
+        },
+        {
+          "var_in": 373.21,
+          "var_ring": 339.54,
+          "var_ratio": 0.0992,
+          "tex_in": 254.54,
+          "tex_ring": 214.44,
+          "tex_ratio": 0.187,
+          "edge_in": 0.00858,
+          "edge_ring": 0.00654,
+          "edge_ratio": 1.3122,
+          "lum_diff": 0.1848
+        }
+      ]
+    },
+    {
+      "index": 88,
+      "metrics": [
+        {
+          "var_in": 329.75,
+          "var_ring": 372.43,
+          "var_ratio": 0.1146,
+          "tex_in": 224.36,
+          "tex_ring": 252.56,
+          "tex_ratio": 0.1117,
+          "edge_in": 0.02619,
+          "edge_ring": 0.01373,
+          "edge_ratio": 1.9076,
+          "lum_diff": 0.22
+        },
+        {
+          "var_in": 286.95,
+          "var_ring": 815.59,
+          "var_ratio": 0.6482,
+          "tex_in": 193.15,
+          "tex_ring": 186.88,
+          "tex_ratio": 0.0335,
+          "edge_in": 0.00447,
+          "edge_ring": 0.01607,
+          "edge_ratio": 0.278,
+          "lum_diff": 0.5421
+        }
+      ]
+    },
+    {
+      "index": 129,
+      "metrics": [
+        {
+          "var_in": 328.73,
+          "var_ring": 361.68,
+          "var_ratio": 0.0911,
+          "tex_in": 222.64,
+          "tex_ring": 251.16,
+          "tex_ratio": 0.1136,
+          "edge_in": 0.00398,
+          "edge_ring": 0.01273,
+          "edge_ratio": 0.3123,
+          "lum_diff": 0.1062
+        },
+        {
+          "var_in": 326.89,
+          "var_ring": 328.48,
+          "var_ratio": 0.0048,
+          "tex_in": 224.65,
+          "tex_ring": 221.45,
+          "tex_ratio": 0.0145,
+          "edge_in": 0.00539,
+          "edge_ring": 0.0062,
+          "edge_ratio": 0.8684,
+          "lum_diff": 0.1157
+        }
+      ]
+    },
+    {
+      "index": 169,
+      "metrics": [
+        {
+          "var_in": 309.97,
+          "var_ring": 392.07,
+          "var_ratio": 0.2094,
+          "tex_in": 206.55,
+          "tex_ring": 231.31,
+          "tex_ratio": 0.107,
+          "edge_in": 0.00966,
+          "edge_ring": 0.01425,
+          "edge_ratio": 0.678,
+          "lum_diff": 0.2316
+        },
+        {
+          "var_in": 305.26,
+          "var_ring": 340.27,
+          "var_ratio": 0.1029,
+          "tex_in": 210.14,
+          "tex_ring": 245.38,
+          "tex_ratio": 0.1436,
+          "edge_in": 0.01063,
+          "edge_ring": 0.01468,
+          "edge_ratio": 0.7244,
+          "lum_diff": 0.1008
+        }
+      ]
+    }
+  ],
+  "frame_indices": [
+    8,
+    48,
+    88,
+    129,
+    169
+  ],
+  "failures": [],
+  "comment": "修复区纹理与邻域一致（最差纹理方差差 0.14），边缘密度比 0.87（背景无边缘，已豁免），肉眼看不出修痕。",
+  "next_params": null,
+  "next_overrides": {},
+  "human_check": {
+    "instruction": "逐张查看 review_frames/frame_0X.jpg：左为原片切片，右为修复后切片",
+    "images": [
+      "review_frames/frame_01.jpg",
+      "review_frames/frame_02.jpg",
+      "review_frames/frame_03.jpg",
+      "review_frames/frame_04.jpg",
+      "review_frames/frame_05.jpg",
+      "review_frames/montage.jpg"
+    ],
+    "montage": "review_frames/montage.jpg"
+  },
+  "llm": {
+    "configured": false,
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-chat",
+    "timeout": 90.0,
+    "usage": {
+      "calls": 0,
+      "ok": 0,
+      "failed": 0,
+      "degraded": 5,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "last_error": "未配置 DEEPSEEK_API_KEY（reviewer_comment 用规则）",
+      "last_latency": null
+    },
+    "client_error": null
+  },
+  "outputs": {
+    "clean_video": "clean.mp4"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "name": "inpaint_grid",
+  "version": 1,
+  "description": "修复参数梯度表。第 N 轮 attempt 默认取 grid[N-1]；LLM 只能在 allowed_* 里选，越界即回退默认值。patch_fill/texture（本项目增量）首轮关闭，只走任务书 baseline 的 cv2.inpaint，质检不达标后由回灌轮打开。",
+  "allowed_methods": ["telea", "ns", "blur"],
+  "allowed_radius": [3, 4, 5, 6, 7, 8],
+  "allowed_blur_mix": [0.0, 0.15, 0.25, 0.35, 0.45, 0.6],
+  "allowed_feather_sigma": [5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+  "allowed_dilate_extra": [0, 2, 4, 6, 8],
+  "allowed_ink_threshold": [0.45, 0.5, 0.55, 0.6, 0.65, 0.7],
+  "allowed_pad_ratio": [0.06, 0.08, 0.1, 0.14, 0.18],
+  "allowed_attenuation_ratio": [0.75, 0.85, 0.95],
+  "allowed_texture_gain": [0.0, 1.5, 2.5, 3.0, 3.5],
+  "grid": [
+    {
+      "attempt": 1,
+      "method": "telea",
+      "radius": 5,
+      "blur_mix": 0.0,
+      "feather_sigma": 7.0,
+      "dilate_extra": 2,
+      "ink_threshold": 0.5,
+      "pad_ratio": 0.1,
+      "attenuation_ratio": 0.85,
+      "texture_gain": 3.0,
+      "patch_fill": false,
+      "texture": false,
+      "why": "默认首选：任务书 baseline（Telea 扩散修复），快；不启用增量回填，用来先探一次质检"
+    },
+    {
+      "attempt": 2,
+      "method": "ns",
+      "radius": 8,
+      "blur_mix": 0.25,
+      "feather_sigma": 9.0,
+      "dilate_extra": 4,
+      "ink_threshold": 0.45,
+      "pad_ratio": 0.14,
+      "attenuation_ratio": 0.85,
+      "texture_gain": 3.5,
+      "patch_fill": true,
+      "texture": true,
+      "why": "边缘残留/纹理断层时：NS 沿等照度线扩散 + 加厚 mask + 少量模糊混合 + 邻近真实块移植（增量）"
+    },
+    {
+      "attempt": 3,
+      "method": "telea",
+      "radius": 8,
+      "blur_mix": 0.45,
+      "feather_sigma": 10.0,
+      "dilate_extra": 8,
+      "ink_threshold": 0.45,
+      "pad_ratio": 0.18,
+      "attenuation_ratio": 0.95,
+      "texture_gain": 3.5,
+      "patch_fill": true,
+      "texture": true,
+      "why": "仍不达标：进一步扩 mask、加大 blur_mix，牺牲一点锐度换干净"
+    }
+  ],
+  "region_overrides": {
+    "edge_residual": {
+      "method": "ns",
+      "radius": 8,
+      "blur_mix": 0.35,
+      "dilate_extra": 6,
+      "ink_threshold": 0.45,
+      "attenuation_ratio": 0.95,
+      "texture_gain": 3.5,
+      "patch_fill": true,
+      "texture": true,
+      "why": "该区域仍能测到水印边缘 → 扩兜底范围、走 NS"
+    },
+    "over_smooth": {
+      "method": "telea",
+      "radius": 4,
+      "blur_mix": 0.0,
+      "dilate_extra": 0,
+      "ink_threshold": 0.6,
+      "attenuation_ratio": 0.85,
+      "texture_gain": 3.5,
+      "patch_fill": true,
+      "texture": true,
+      "why": "该区域被修糊了（边缘密度显著低于邻域）→ 缩 mask、减混合、换小半径，靠纹理回填补方差"
+    }
+  }
+}

@@ -1,0 +1,1 @@
+"""agents 包：一个文件一个 Agent，彼此之间**不 import**，只靠 payload 与事件通信。"""

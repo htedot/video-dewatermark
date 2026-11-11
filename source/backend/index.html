@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>视频自动去水印工具 · 多智能体流水线</title>
+<style>
+  :root {
+    --bg: #0b0f16;
+    --bg-soft: #111827;
+    --card: #141c28;
+    --card-2: #1a2432;
+    --line: #243244;
+    --ink: #e8eef8;
+    --muted: #8ea0b8;
+    --accent: #38d9a9;
+    --accent-2: #4dabf7;
+    --warn: #ffd43b;
+    --danger: #ff6b6b;
+    --ok: #51cf66;
+    --radius: 14px;
+    --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 80% -10%, #16324a 0%, transparent 60%),
+                radial-gradient(900px 500px at -10% 10%, #14332c 0%, transparent 55%),
+                var(--bg);
+    color: var(--ink);
+    font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  a { color: var(--accent-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, .mono { font-family: var(--mono); }
+
+  .topbar {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 16px 24px; border-bottom: 1px solid var(--line);
+    background: rgba(11, 15, 22, .72); backdrop-filter: blur(10px);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; color: #062a20; font-weight: 800; font-size: 17px;
+    box-shadow: 0 6px 18px rgba(56, 217, 169, .25);
+  }
+  .brand h1 { font-size: 16px; margin: 0; letter-spacing: .3px; }
+  .brand p { margin: 0; font-size: 12px; color: var(--muted); }
+  .pills { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px;
+    background: var(--card); font-size: 12px; color: var(--muted);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.warn { background: var(--warn); }
+  .dot.err { background: var(--danger); }
+
+  .layout {
+    display: grid; grid-template-columns: 370px minmax(0, 1fr);
+    gap: 18px; padding: 18px 24px 40px; max-width: 1680px; margin: 0 auto;
+  }
+  @media (max-width: 1080px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: linear-gradient(180deg, var(--card), var(--card-2));
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
+  }
+  .card h2 {
+    font-size: 13px; letter-spacing: .8px; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .idx {
+    width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center;
+    background: rgba(56, 217, 169, .12); color: var(--accent); font-size: 11px;
+  }
+  .hint { color: var(--muted); font-size: 12px; }
+
+  /* 授权声明 */
+  .auth {
+    border-color: rgba(255, 212, 59, .35);
+    background: linear-gradient(180deg, rgba(255, 212, 59, .10), var(--card-2));
+  }
+  .auth .title { display: flex; align-items: center; gap: 8px; color: var(--warn); font-weight: 700; font-size: 14px; }
+  .auth p { color: #e6d9a8; font-size: 12.5px; margin: 8px 0 12px; }
+  .auth label {
+    display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+    background: rgba(0, 0, 0, .22); border: 1px solid rgba(255, 212, 59, .25);
+    padding: 10px; border-radius: 10px; font-size: 12.5px;
+  }
+  .auth input { margin-top: 2px; accent-color: var(--accent); }
+
+  /* 输入 */
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    flex: 1; text-align: center; padding: 7px 8px; border-radius: 9px; cursor: pointer;
+    border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12.5px;
+  }
+  .tab.active { background: rgba(77, 171, 247, .14); border-color: rgba(77, 171, 247, .45); color: var(--ink); }
+  .drop {
+    border: 1.5px dashed #2f4258; border-radius: 12px; padding: 22px 12px; text-align: center;
+    color: var(--muted); cursor: pointer; transition: .15s;
+  }
+  .drop:hover, .drop.over { border-color: var(--accent); color: var(--ink); background: rgba(56, 217, 169, .06); }
+  .drop strong { color: var(--ink); }
+  input[type=text], input[type=number] {
+    width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line);
+    background: #0d141d; color: var(--ink); font-family: var(--mono); font-size: 12.5px;
+  }
+  input[type=text]:focus, input[type=number]:focus { outline: 1px solid var(--accent-2); }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .btn {
+    border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
+    padding: 9px 14px; border-radius: 9px; cursor: pointer; font-size: 13px;
+  }
+  .btn:hover { border-color: #3a5169; }
+  .btn.ghost { background: transparent; }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), #2bb890); color: #05231b;
+    border: none; font-weight: 700; width: 100%; padding: 12px; font-size: 14px;
+    box-shadow: 0 8px 24px rgba(56, 217, 169, .18);
+  }
+  .btn.primary:disabled { filter: grayscale(.7) brightness(.75); cursor: not-allowed; box-shadow: none; }
+  .src-info { margin-top: 10px; font-size: 12px; color: var(--muted); word-break: break-all; }
+  .src-info b { color: var(--ink); font-family: var(--mono); font-weight: 500; }
+
+  /* 参数 */
+  .field { margin-bottom: 12px; }
+  .field .lab { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px; }
+  .field .lab span:last-child { color: var(--accent); font-family: var(--mono); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+
+  /* DAG */
+  .dag { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
+  .node {
+    flex: 1 1 120px; min-width: 120px; border: 1px solid var(--line); border-radius: 11px;
+    padding: 9px 11px; background: #0f1621; position: relative; transition: .2s;
+  }
+  .node .k { font-size: 12.5px; font-weight: 600; }
+  .node .s { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .node[data-state=running] { border-color: var(--accent-2); box-shadow: 0 0 0 1px rgba(77, 171, 247, .25) inset; }
+  .node[data-state=running] .s { color: var(--accent-2); }
+  .node[data-state=done] { border-color: rgba(81, 207, 102, .45); background: rgba(81, 207, 102, .07); }
+  .node[data-state=done] .s { color: var(--ok); }
+  .node[data-state=fail] { border-color: rgba(255, 107, 107, .5); background: rgba(255, 107, 107, .08); }
+  .node[data-state=fail] .s { color: var(--danger); }
+  .node .badge {
+    position: absolute; top: -7px; right: 8px; font-size: 10px; padding: 1px 6px;
+    border-radius: 999px; background: var(--card-2); border: 1px solid var(--line); color: var(--muted);
+  }
+
+  /* 进度 */
+  .progress-line { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .bar { height: 8px; border-radius: 999px; background: #0d141d; overflow: hidden; border: 1px solid var(--line); }
+  .bar > i {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .35s ease;
+  }
+
+  /* 日志 */
+  .logs {
+    height: 320px; overflow: auto; background: #0a1017; border: 1px solid var(--line);
+    border-radius: 11px; padding: 10px 12px; font-family: var(--mono); font-size: 12px;
+  }
+  .log-line { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(36, 50, 68, .35); }
+  .log-line .t { color: #5d7288; flex: 0 0 62px; }
+  .log-line .tag {
+    flex: 0 0 auto; padding: 0 6px; border-radius: 4px; font-size: 10.5px; align-self: center;
+    background: rgba(77, 171, 247, .14); color: #8ec5ff;
+  }
+  .log-line .m { flex: 1; color: #cfdcec; word-break: break-word; }
+  .log-line.ok .tag { background: rgba(81, 207, 102, .16); color: #9be6a6; }
+  .log-line.warn .tag { background: rgba(255, 212, 59, .16); color: #ffe08a; }
+  .log-line.err .tag { background: rgba(255, 107, 107, .18); color: #ffb3b3; }
+  .log-line.fb .tag { background: rgba(255, 146, 43, .18); color: #ffc38a; }
+
+  /* 结果 */
+  .result-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .score {
+    font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .score small { font-size: 12px; color: var(--muted); -webkit-text-fill-color: var(--muted); }
+  .verdict { padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }
+  .verdict.pass { background: rgba(81, 207, 102, .15); color: #7ee68c; border: 1px solid rgba(81, 207, 102, .4); }
+  .verdict.fail { background: rgba(255, 107, 107, .14); color: #ff9c9c; border: 1px solid rgba(255, 107, 107, .4); }
+  .dims { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
+  .dim .lab { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .dim .bar { height: 6px; margin-top: 5px; }
+  .dim .bar > i { background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+  .fails { margin: 14px 0 0; padding: 0; list-style: none; }
+  .fails li {
+    font-size: 12.5px; color: #ffc0c0; background: rgba(255, 107, 107, .08);
+    border-left: 3px solid rgba(255, 107, 107, .55); padding: 6px 10px; border-radius: 0 8px 8px 0; margin-bottom: 6px;
+  }
+  .videos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  @media (max-width: 900px) { .videos { grid-template-columns: 1fr; } }
+  .videos figure { margin: 0; }
+  .videos figcaption { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  video { width: 100%; border-radius: 11px; background: #000; border: 1px solid var(--line); }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 14px; }
+  .shots a { display: block; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #0b1119; }
+  .shots img { width: 100%; display: block; }
+  .shots span { display: block; padding: 6px 8px; font-size: 11.5px; color: var(--muted); }
+  table.art { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+  table.art th, table.art td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.art th { color: var(--muted); font-weight: 500; }
+  table.art td.mono { font-family: var(--mono); font-size: 12px; }
+
+  .runs { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow: auto; }
+  .run-row {
+    display: flex; gap: 10px; align-items: center; justify-content: space-between;
+    padding: 7px 10px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; font-size: 12.5px;
+    background: #0f1621;
+  }
+  .run-row:hover { border-color: #3a5169; }
+  .run-row .id { font-family: var(--mono); }
+  .run-row .meta { color: var(--muted); font-size: 11.5px; }
+
+  footer {
+    border-top: 1px solid var(--line); padding: 18px 24px 28px; color: var(--muted);
+    font-size: 12px; text-align: center;
+  }
+  .empty { color: var(--muted); font-size: 12.5px; padding: 8px 0; }
+  .kbd { font-family: var(--mono); background: #0d141d; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 11.5px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">去</div>
+    <div>
+      <h1>视频自动去水印工具</h1>
+      <p>多智能体流水线 · 检测 → 遮罩 → 修复 → 精修 → 质检（不达标自动回灌）</p>
+    </div>
+  </div>
+  <div class="pills">
+    <span class="pill"><i class="dot" id="dot-svc"></i><span id="pill-svc">服务检测中…</span></span>
+    <span class="pill"><i class="dot" id="dot-ff"></i><span id="pill-ff">ffmpeg</span></span>
+    <span class="pill"><i class="dot" id="dot-llm"></i><span id="pill-llm">LLM</span></span>
+    <span class="pill mono" id="pill-port">:—</span>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- 左列：输入 / 参数 -->
+  <div>
+    <div class="card auth">
+      <div class="title">⚠ 授权声明（必读）</div>
+      <p>
+        本工具仅用于处理<strong>你本人拥有版权</strong>或<strong>已取得权利人明确授权</strong>的视频内容，
+        例如清理自己作品的台标、去除自有素材上的演示字样。
+        <strong>禁止</strong>用它去除他人作品的水印、台标、版权标识或平台标识 —— 这可能侵犯著作权、
+        违反平台规则并承担法律责任。
+      </p>
+      <label>
+        <input type="checkbox" id="authorized" />
+        <span>我确认：本次处理的视频为我本人所有或已获得授权，且用于合法用途；我愿意对使用行为负责。</span>
+      </label>
+    </div>
+
+    <div class="card">
+      <h2><span class="idx">1</span>输入视频</h2>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="upload">本地上传</button>
+        <button class="tab" data-tab="path">服务器路径</button>
+        <button class="tab" data-tab="sample">内置示例</button>
+      </div>
+
+      <div data-pane="upload">
+        <div class="drop" id="drop">
+          <strong>点击选择</strong> 或把视频拖到这里<br />
+          <span class="hint">mp4 / mov / mkv / avi / webm，最大 512MB</span>
+        </div>
+        <input type="file" id="file" accept="video/*" hidden />
+      </div>
+
+      <div data-pane="path" hidden>
+        <input type="text" id="path" placeholder="E:\123\video_dewatermark\backend\outputs\_uploads\selftest\sample.mp4" />
+        <div class="row">
+          <button class="btn ghost" id="use-path">使用该路径</button>
+          <span class="hint">必须是本机绝对路径，且位于工作区内</span>
+        </div>
+      </div>
+
+      <div data-pane="sample" hidden>
+        <div class="hint">生成一段自带两处静态水印的演示视频（固定位置，出现率 100%，便于验证检测与修复）。</div>
+        <div class="row"><button class="btn ghost" id="use-sample">生成示例视频</button></div>
+      </div>
+
+      <div class="src-info" id="src-info">尚未选择视频</div>
+    </div>
+
+    <div class="card">
+      <h2><span class="idx">2</span>检测参数</h2>
+      <div class="field">
+        <div class="lab"><span>采样帧数（多帧投票）</span><span id="v-frames">48</span></div>
+        <input type="range" id="p-frames" min="16" max="120" step="8" value="48" />
+      </div>
+      <div class="field">
+        <div class="lab"><span>出现率阈值</span><span id="v-rate">0.70</span></div>
+        <input type="range" id="p-rate" min="0.30" max="0.95" step="0.05" value="0.70" />
+      </div>
+      <div class="field">
+        <div class="lab"><span>最多保留区域</span><span id="v-regions">6</span></div>
+        <input type="range" id="p-regions" min="1" max="10" step="1" value="6" />
+      </div>
+      <div class="field">
+        <div class="lab"><span>最低置信度</span><span id="v-conf">0.45</span></div>
+        <input type="range" id="p-conf" min="0" max="0.95" step="0.05" value="0.45" />
+      </div>
+      <button class="btn primary" id="run" disabled>开始去水印</button>
+      <div class="hint" id="run-hint" style="margin-top:8px">请先勾选上方授权声明并选择视频</div>
+    </div>
+
+    <div class="card">
+      <h2>历史任务</h2>
+      <div class="runs" id="runs"><div class="empty">加载中…</div></div>
+    </div>
+  </div>
+
+  <!-- 右列：流水线 / 日志 / 结果 -->
+  <div>
+    <div class="card">
+      <h2><span class="idx">3</span>流水线状态 <span class="hint" id="attempt-hint"></span></h2>
+      <div class="dag" id="dag"><div class="empty">加载 DAG…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="progress-line">
+        <span id="status-text">等待开始</span>
+        <span class="mono" id="percent">0%</span>
+      </div>
+      <div class="bar"><i id="bar"></i></div>
+    </div>
+
+    <div class="card">
+      <h2>运行日志（SSE 实时）<span class="hint" id="run-id"></span></h2>
+      <div class="logs" id="logs"><div class="empty">勾选授权、选择视频后点击「开始去水印」，这里会实时滚动每个 Agent 的事件。</div></div>
+    </div>
+
+    <div class="card" id="result-card" hidden>
+      <h2><span class="idx">4</span>质检与产物</h2>
+      <div class="result-head">
+        <div class="score" id="r-score">—<small> / 100</small></div>
+        <div id="r-verdict"></div>
+        <div class="hint" id="r-meta"></div>
+      </div>
+      <div class="dims" id="r-dims"></div>
+      <ul class="fails" id="r-fails"></ul>
+      <div class="videos">
+        <figure>
+          <figcaption>原片（检测框已标出）</figcaption>
+          <video id="v-src" controls playsinline></video>
+        </figure>
+        <figure>
+          <figcaption>成品（去水印后）</figcaption>
+          <video id="v-clean" controls playsinline></video>
+        </figure>
+      </div>
+      <div class="shots" id="r-shots"></div>
+      <h2 style="margin-top:20px">产物清单</h2>
+      <table class="art" id="r-art"></table>
+    </div>
+  </div>
+</main>
+
+<footer>
+  仅限授权内容使用 · 检测与修复全部在本机离线完成（OpenCV + ffmpeg），不向云端上传视频 ·
+  LLM 仅在配置了 Key 时用于参数建议与评语，不参与像素处理
+</footer>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    srcPath: null,
+    srcName: null,
+    srcVideo: null,
+    runId: null,
+    es: null,
+    running: false,
+    taskDone: false,
+    dagLayers: [],
+    attempts: 0,
+  };
+  const AGENT_LABEL = { detector: "检测", mask: "遮罩", inpainter: "修复", refiner: "精修", reviewer: "质检", preview: "对比预览", report: "报告" };
+
+  const fmtBytes = (n) => {
+    if (!n && n !== 0) return "—";
+    const u = ["B", "KB", "MB", "GB"];
+    let i = 0, v = n;
+    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${u[i]}`;
+  };
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const now = () => new Date().toLocaleTimeString("zh-CN", { hour12: false });
+
+  // ---------------- 健康检查 ----------------
+  async function loadHealth() {
+    try {
+      const r = await fetch("/api/health");
+      const d = await r.json();
+      $("dot-svc").className = "dot ok";
+      $("pill-svc").textContent = `服务正常 · v${d.version}`;
+      $("pill-port").textContent = `:${d.port}`;
+      const ff = d.ffmpeg || {};
+      const ffOk = !!(ff.ok || ff.available);
+      const ffVer = (String(ff.version || "").match(/version\s+([^\s]+)/) || [])[1] || "";
+      $("dot-ff").className = "dot " + (ffOk ? "ok" : "err");
+      $("pill-ff").textContent = ffOk ? `ffmpeg ${ffVer}`.trim() : "ffmpeg 缺失";
+      const llm = d.llm || {};
+      const llmOk = !!(llm.configured || llm.available);
+      $("dot-llm").className = "dot " + (llmOk ? "ok" : "warn");
+      $("pill-llm").textContent = llmOk ? `LLM ${llm.model || ""}` : "LLM 未配置（规则降级）";
+    } catch (e) {
+      $("dot-svc").className = "dot err";
+      $("pill-svc").textContent = "服务不可达";
+    }
+  }
+
+  // ---------------- DAG ----------------
+  async function loadDag() {
+    try {
+      const d = await (await fetch("/api/dag")).json();
+      state.dagLayers = d.layers || [];
+      document.querySelectorAll("#dag .node").forEach((n) => n.remove());
+      const box = $("dag");
+      const emptyEl = box.querySelector(".empty");
+      if (emptyEl) emptyEl.remove();
+      (d.nodes || []).forEach((n) => {
+        const div = document.createElement("div");
+        div.className = "node";
+        div.dataset.key = n.key;
+        div.dataset.state = "idle";
+        div.innerHTML = `<div class="k">${esc(n.label)}</div><div class="s">${esc(n.key)}</div>`
+          + (n.parallel_group ? `<span class="badge">并行</span>` : "");
+        div.title = n.description || "";
+        box.appendChild(div);
+      });
+      const fb = d.feedback;
+      if (fb) $("attempt-hint").textContent = `回灌：${fb.from} → ${fb.to}，最多 ${fb.max_retries} 次`;
+    } catch (e) {
+      $("dag").innerHTML = `<div class="empty">DAG 加载失败：${esc(e.message)}</div>`;
+    }
+  }
+
+  const setNode = (key, stateName, sub) => {
+    const node = document.querySelector(`#dag .node[data-key="${key}"]`);
+    if (!node) return;
+    node.dataset.state = stateName;
+    const s = node.querySelector(".s");
+    if (s && sub) s.textContent = sub;
+  };
+  const resetNodes = () => document.querySelectorAll("#dag .node").forEach((n) => {
+    n.dataset.state = "idle";
+    n.querySelector(".s").textContent = n.dataset.key;
+  });
+
+  // ---------------- 日志 ----------------
+  function log(type, message, cls) {
+    const box = $("logs");
+    const emptyEl = box.querySelector(".empty");
+    if (emptyEl) emptyEl.remove();
+    const line = document.createElement("div");
+    line.className = "log-line " + (cls || "");
+    line.innerHTML = `<span class="t">${now()}</span><span class="tag">${esc(type)}</span><span class="m">${esc(message)}</span>`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ---------------- 输入 ----------------
+  function setSource(path, name, video) {
+    state.srcPath = path;
+    state.srcName = name;
+    state.srcVideo = video || null;
+    const v = video || {};
+    const info = [];
+    if (v.width) info.push(`${v.width}×${v.height}`);
+    if (v.fps) info.push(`${Number(v.fps).toFixed(2)} fps`);
+    if (v.duration) info.push(`${Number(v.duration).toFixed(2)} s`);
+    if (v.frame_count) info.push(`${v.frame_count} 帧`);
+    if (v.has_audio !== undefined) info.push(v.has_audio ? "含音轨" : "无音轨");
+    $("src-info").innerHTML = `<b>${esc(name || String(path).split(/[\\/]/).pop())}</b>`
+      + (info.length ? ` · ${esc(info.join(" · "))}` : "")
+      + `<br /><span class="hint mono">${esc(path)}</span>`;
+    refreshRunBtn();
+  }
+
+  function refreshRunBtn() {
+    const ok = !!state.srcPath && $("authorized").checked && !state.running;
+    $("run").disabled = !ok;
+    $("run-hint").textContent = state.running ? "任务执行中，请稍候…"
+      : (!state.srcPath ? "请选择视频" : (!$("authorized").checked ? "请先勾选授权声明" : "就绪，可以开始"));
+  }
+
+  document.querySelectorAll("#tabs .tab").forEach((t) => {
+    t.onclick = () => {
+      document.querySelectorAll("#tabs .tab").forEach((x) => x.classList.toggle("active", x === t));
+      document.querySelectorAll("[data-pane]").forEach((p) => { p.hidden = p.dataset.pane !== t.dataset.tab; });
+    };
+  });
+
+  const drop = $("drop");
+  drop.onclick = () => $("file").click();
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = (e) => {
+    e.preventDefault(); drop.classList.remove("over");
+    if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+  };
+  $("file").onchange = (e) => { if (e.target.files[0]) uploadFile(e.target.files[0]); };
+
+  async function uploadFile(file) {
+    drop.innerHTML = `<strong>上传中…</strong><br /><span class="hint">${esc(file.name)} · ${fmtBytes(file.size)}</span>`;
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const r = await fetch("/api/upload", { method: "POST", body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "上传失败");
+      drop.innerHTML = `<strong>已上传</strong><br /><span class="hint">${esc(file.name)}</span>`;
+      setSource(d.input_path, d.name, d.video);
+      log("upload", `上传完成：${d.name}（${fmtBytes(d.bytes)}）`, "ok");
+    } catch (e) {
+      drop.innerHTML = `<strong>上传失败</strong><br /><span class="hint">${esc(e.message)}</span>`;
+      log("upload", `上传失败：${e.message}`, "err");
+    }
+  }
+
+  $("use-path").onclick = () => {
+    const p = $("path").value.trim();
+    if (!p) return;
+    setSource(p, p.split(/[\\/]/).pop(), null);
+    log("input", `已指定服务器路径：${p}`);
+  };
+
+  $("use-sample").onclick = async () => {
+    const btn = $("use-sample");
+    btn.disabled = true; btn.textContent = "生成中…";
+    try {
+      const r = await fetch("/api/sample?seconds=6", { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "生成失败");
+      setSource(d.input_path, d.name, d.video);
+      log("sample", `示例视频已生成：${d.name}（${fmtBytes(d.bytes)}）`, "ok");
+    } catch (e) {
+      log("sample", `示例生成失败：${e.message}`, "err");
+    } finally {
+      btn.disabled = false; btn.textContent = "生成示例视频";
+    }
+  };
+
+  $("authorized").onchange = refreshRunBtn;
+
+  [["p-frames", "v-frames", 0], ["p-rate", "v-rate", 2], ["p-regions", "v-regions", 0], ["p-conf", "v-conf", 2]]
+    .forEach(([id, out, digits]) => {
+      const el = $(id);
+      const sync = () => { $(out).textContent = Number(el.value).toFixed(digits); };
+      el.oninput = sync; sync();
+    });
+
+  // ---------------- 任务执行 ----------------
+  function newRunId() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `ui${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  }
+
+  function openStream(runId) {
+    if (state.es) { state.es.close(); state.es = null; }
+    const es = new EventSource(`/api/events?run_id=${encodeURIComponent(runId)}`);
+    state.es = es;
+    es.onmessage = (ev) => {
+      let data;
+      try { data = JSON.parse(ev.data); } catch (_) { return; }
+      handleEvent(data);
+    };
+    es.onerror = () => {
+      // 任务结束后服务端会保持连接；真断了就提示，不自动重连以免重复日志
+      if (state.running) log("sse", "事件流中断（任务可能仍在后台执行，可刷新查看历史）", "warn");
+    };
+  }
+
+  function handleEvent(e) {
+    const type = e.type || "event";
+    const msg = e.message || "";
+    const agent = e.agent;
+    if (type === "stream_ready") { log("sse", "事件流已连接", "ok"); return; }
+
+    if (type === "agent_started") {
+      if (agent) setNode(agent, "running", (e.label || AGENT_LABEL[agent] || agent) + " · 运行中");
+      log(type, msg || `${AGENT_LABEL[agent] || agent} 开始`, "");
+    } else if (type === "agent_completed") {
+      if (agent) setNode(agent, "done", (e.label || AGENT_LABEL[agent] || agent) + " · 完成");
+      log(type, msg, "ok");
+      if (typeof e.percent === "number") setProgress(Math.max(num("bar").style.width || 0, e.percent));
+    } else if (type === "agent_failed") {
+      if (agent) setNode(agent, "fail", (e.label || agent) + " · 失败");
+      log(type, msg || "失败", "err");
+    } else if (type === "agent_progress") {
+      if (agent) setNode(agent, "running", `${AGENT_LABEL[agent] || agent} · ${msg}`);
+      log(type, `${AGENT_LABEL[agent] || agent}：${msg}`, "");
+      if (typeof e.percent === "number") setProgress(e.percent);
+    } else if (type === "review_feedback") {
+      state.attempts = e.attempt || state.attempts + 1;
+      log(type, `↺ ${msg}`, "fb");
+      setProgress(0);
+      document.querySelectorAll("#dag .node").forEach((n) => {
+        if (["mask", "inpainter", "refiner", "reviewer"].includes(n.dataset.key)) {
+          n.dataset.state = "idle"; n.querySelector(".s").textContent = n.dataset.key;
+        }
+      });
+    } else if (type === "parallel_started" || type === "parallel_completed") {
+      log(type, msg || type, "");
+    } else if (type === "task_started") {
+      log(type, msg || "任务开始", "ok");
+      setProgress(2);
+      $("status-text").textContent = "运行中…";
+    } else if (type === "task_completed") {
+      state.running = false; state.taskDone = true;
+      log(type, msg, "ok");
+      setProgress(100);
+      $("status-text").textContent = "完成";
+      refreshRunBtn();
+      if (state.es) { state.es.close(); state.es = null; }
+      if (state.runId) showRun(state.runId);
+      loadRuns();
+    } else if (type === "task_failed") {
+      state.running = false;
+      log(type, msg || "任务失败", "err");
+      $("status-text").textContent = "失败";
+      refreshRunBtn();
+      if (state.es) { state.es.close(); state.es = null; }
+      loadRuns();
+    } else if (type === "llm_call") {
+      log(type, msg, "warn");
+    } else {
+      log(type, msg, "");
+    }
+  }
+
+  const num = (v) => parseFloat(v) || 0;
+  function setProgress(pct) {
+    const p = Math.max(0, Math.min(100, Math.round(pct)));
+    $("bar").style.width = p + "%";
+    $("percent").textContent = p + "%";
+  }
+
+  $("run").onclick = async () => {
+    if (!state.srcPath || !$("authorized").checked) return;
+    const runId = newRunId();
+    state.runId = runId;
+    state.running = true;
+    state.taskDone = false;
+    state.attempts = 1;
+    refreshRunBtn();
+    resetNodes();
+    setProgress(1);
+    $("status-text").textContent = "已排队…";
+    $("run-id").textContent = `· ${runId}`;
+    $("logs").innerHTML = "";
+    $("result-card").hidden = true;
+    log("ui", `准备任务 ${runId}`);
+
+    // 关键顺序：先建立 SSE 连接（收到 stream_ready 后再 POST），避免漏掉开头事件
+    openStream(runId);
+    waitReady(runId, 2500).then(async () => {
+      const body = {
+        run_id: runId,
+        input_path: state.srcPath,
+        authorized: true,
+        params: {
+          sample_frames: Number($("p-frames").value),
+          appear_rate: Number($("p-rate").value),
+          max_regions: Number($("p-regions").value),
+          min_conf: Number($("p-conf").value),
+        },
+      };
+      try {
+        const r = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || "提交失败");
+        log("ui", `任务已提交（${d.status}），DAG ${d.dag.length} 层`, "ok");
+      } catch (e) {
+        state.running = false; refreshRunBtn();
+        log("ui", `提交失败：${e.message}`, "err");
+        $("status-text").textContent = "提交失败";
+        if (state.es) { state.es.close(); state.es = null; }
+      }
+    });
+  };
+
+  function waitReady(runId, timeoutMs) {
+    return new Promise((resolve) => {
+      const t0 = Date.now();
+      const tick = () => {
+        if (!state.es || state.es.readyState === 2 || Date.now() - t0 > timeoutMs) return resolve(false);
+        if (state.es.readyState === 1) return resolve(true);
+        setTimeout(tick, 60);
+      };
+      tick();
+    });
+  }
+
+  // ---------------- 历史 & 结果 ----------------
+  async function loadRuns() {
+    try {
+      const d = await (await fetch("/api/runs")).json();
+      const box = $("runs");
+      if (!d.runs || !d.runs.length) { box.innerHTML = `<div class="empty">还没有任务</div>`; return; }
+      box.innerHTML = d.runs.slice(0, 30).map((r) => {
+        const st = r.status === "running" ? "运行中"
+          : r.passed === true ? "达标" : r.passed === false ? "未达标" : (r.status || "?");
+        return `<div class="run-row" data-run="${esc(r.run_id)}">
+          <div><div class="id">${esc(r.run_id)}</div>
+          <div class="meta">${esc(r.src_name || "")} · ${esc(st)}${r.score != null ? ` · ${r.score} 分` : ""}</div></div>
+          <div class="meta">${esc((r.created ? new Date(r.created * 1000).toLocaleString("zh-CN", { hour12: false }) : ""))}</div>
+        </div>`;
+      }).join("");
+      box.querySelectorAll(".run-row").forEach((row) => {
+        row.onclick = () => showRun(row.dataset.run);
+      });
+    } catch (e) {
+      $("runs").innerHTML = `<div class="empty">历史加载失败：${esc(e.message)}</div>`;
+    }
+  }
+
+  async function showRun(runId) {
+    try {
+      const d = await (await fetch(`/api/runs/${encodeURIComponent(runId)}`)).json();
+      state.runId = runId;
+      $("run-id").textContent = `· ${runId}`;
+      const review = d.review || null;
+      const card = $("result-card");
+      card.hidden = false;
+
+      // 视频
+      $("v-src").src = `/api/runs/${encodeURIComponent(runId)}/source`;
+      $("v-clean").src = `/api/runs/${encodeURIComponent(runId)}/video`;
+
+      const score = review?.score;
+      $("r-score").innerHTML = `${score != null ? score : "—"}<small> / 100</small>`;
+      const v = $("r-verdict");
+      if (review) {
+        v.className = "verdict " + (review.passed ? "pass" : "fail");
+        v.textContent = review.passed ? "质检通过" : "未达标（已尽力回灌）";
+        $("r-meta").textContent = `${review.attempts || review.attempt || 1} 轮 · 阈值 ${review.pass_score ?? "—"} 分`
+          + (review.human_check ? " · 请人工抽查 5 帧" : "");
+      } else {
+        v.className = "verdict fail"; v.textContent = d.status || "未知";
+      }
+
+      // 维度
+      const dims = review?.dimensions || {};
+      $("r-dims").innerHTML = Object.entries(dims).map(([k, dim]) => `
+        <div class="dim">
+          <div class="lab"><span>${esc(dim.label || k)}</span><span class="mono">${dim.score} / 权重 ${dim.weight}</span></div>
+          <div class="bar"><i style="width:${Math.max(0, Math.min(100, dim.score))}%"></i></div>
+          <div class="hint">${esc(dim.detail || "")}</div>
+        </div>`).join("");
+
+      // 失败项
+      const fails = review?.failures || [];
+      $("r-fails").innerHTML = fails.map((f) => `<li>${esc(f)}</li>`).join("");
+      if (review?.comment) {
+        $("r-fails").insertAdjacentHTML("afterbegin",
+          `<li style="color:#cfe3d6;background:rgba(81,207,102,.08);border-left-color:rgba(81,207,102,.5)">评语：${esc(review.comment)}</li>`);
+      }
+
+      // 帧截图
+      const shots = [];
+      (d.artifacts || []).forEach((a) => {
+        if (/^(review_frames\/frame_|detect_preview|detect_support|mask_heat|preview_before_after|review_frames\/montage)/.test(a.name)) {
+          const url = `/api/runs/${encodeURIComponent(runId)}/files/${a.name.split("/").map(encodeURIComponent).join("/")}`;
+          shots.push(`<a href="${url}" target="_blank"><img src="${url}" loading="lazy" alt="${esc(a.name)}" /><span>${esc(a.name)}</span></a>`);
+        }
+      });
+      $("r-shots").innerHTML = shots.join("");
+
+      // 产物表
+      const rows = (d.artifacts || []).map((a) => {
+        const url = `/api/runs/${encodeURIComponent(runId)}/files/${a.name.split("/").map(encodeURIComponent).join("/")}`;
+        return `<tr><td class="mono"><a href="${url}" target="_blank">${esc(a.name)}</a></td><td class="mono">${fmtBytes(a.bytes)}</td></tr>`;
+      }).join("");
+      $("r-art").innerHTML = `<tr><th>文件</th><th>大小</th></tr>${rows}`;
+
+      // 日志回放（只回放当前 run 的事件，避免串台）
+      const events = d.events || [];
+      if (events.length && !state.running) {
+        $("logs").innerHTML = "";
+        events.forEach((raw) => {
+          let e; try { e = typeof raw === "string" ? JSON.parse(raw) : raw; } catch (_) { return; }
+          if (e.run_id && e.run_id !== runId) return;
+          if (["stream_ready"].includes(e.type)) return;
+          const cls = e.type === "task_completed" ? "ok" : e.type === "review_feedback" ? "fb"
+            : (e.type === "agent_failed" || e.type === "task_failed") ? "err" : "";
+          log(e.type, e.message || "", cls);
+        });
+        if (review) {
+          setProgress(100);
+          $("status-text").textContent = review.passed ? "完成（质检通过）" : "完成（未达标）";
+        }
+      }
+      (d.artifacts || []).forEach(() => {});
+    } catch (e) {
+      log("ui", `读取任务 ${runId} 失败：${e.message}`, "err");
+    }
+  }
+
+  // ---------------- 启动 ----------------
+  loadHealth();
+  loadDag();
+  loadRuns();
+  refreshRunBtn();
+  setInterval(loadHealth, 20000);
+})();
+</script>
+</body>
+</html>

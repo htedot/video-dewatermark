@@ -1,0 +1,461 @@
+{
+  "run_id": "pagedemo01",
+  "generated_at": "2026-11-11 16:46:45",
+  "app": {
+    "name": "视频自动去水印工具",
+    "version": "1.0.0"
+  },
+  "request": {
+    "sample_frames": 48,
+    "appear_rate": 0.7,
+    "max_regions": 6,
+    "min_conf": 0.45
+  },
+  "authorized_note": "用户已勾选「仅处理本人拥有版权或已获授权的内容」",
+  "video": {
+    "path": "E:\\123\\video_dewatermark\\backend\\outputs\\_uploads\\sample_1794386670_a7ba12\\sample_watermark.mp4",
+    "width": 1280,
+    "height": 720,
+    "fps": 30.0,
+    "frame_count": 180,
+    "duration": 6.0,
+    "has_audio": true,
+    "codec": "h264",
+    "size_bytes": 8937648
+  },
+  "detection": {
+    "method": "多帧投票（Canny 边缘出现率 > 阈值）",
+    "sample": {
+      "frames": 48,
+      "indices": [
+        0,
+        4,
+        8,
+        11,
+        15,
+        19,
+        23,
+        27,
+        30,
+        34,
+        38,
+        42,
+        46,
+        50,
+        53,
+        57,
+        61,
+        65,
+        69,
+        72,
+        76,
+        80,
+        84,
+        88,
+        91,
+        95,
+        99,
+        103,
+        107,
+        110,
+        114,
+        118,
+        122,
+        126,
+        129,
+        133,
+        137,
+        141,
+        145,
+        149,
+        152,
+        156,
+        160,
+        164,
+        168,
+        171,
+        175,
+        179
+      ],
+      "work_size": [
+        960,
+        540
+      ],
+      "scale": 0.75,
+      "appear_rate_threshold": 0.7
+    },
+    "appear_rate_threshold": 0.7,
+    "candidates": [
+      {
+        "id": "c1",
+        "bbox": [
+          690,
+          25,
+          236,
+          20
+        ],
+        "bbox_norm": [
+          0.7188,
+          0.0463,
+          0.2458,
+          0.037
+        ],
+        "area_ratio": 0.009105,
+        "appear_rate": 0.9978,
+        "stability": 0.4482,
+        "edge_strength": 0.9514,
+        "contrast": 1.0,
+        "zone": "top_corner",
+        "position_prior": 0.95,
+        "confidence": 0.8711,
+        "fill_ratio": 0.937,
+        "inner_tstd": 13.24,
+        "merged_from": 1,
+        "seed_source": "median_edge+vote"
+      },
+      {
+        "id": "c2",
+        "bbox": [
+          26,
+          467,
+          140,
+          47
+        ],
+        "bbox_norm": [
+          0.0271,
+          0.8648,
+          0.1458,
+          0.087
+        ],
+        "area_ratio": 0.012693,
+        "appear_rate": 0.9985,
+        "stability": 0.6302,
+        "edge_strength": 0.96,
+        "contrast": 1.0,
+        "zone": "bottom_corner",
+        "position_prior": 0.9,
+        "confidence": 0.8992,
+        "fill_ratio": 0.686,
+        "inner_tstd": 8.88,
+        "merged_from": 2,
+        "seed_source": "median_edge+vote"
+      }
+    ],
+    "selected": [
+      "c2",
+      "c1"
+    ],
+    "regions": [
+      {
+        "id": "c2",
+        "bbox": [
+          35,
+          623,
+          187,
+          63
+        ],
+        "bbox_work": [
+          26,
+          467,
+          140,
+          47
+        ],
+        "kind": "logo",
+        "confidence": 0.8992,
+        "appear_rate": 0.9985,
+        "zone": "bottom_corner",
+        "reason": "规则：置信度 0.90，位于 bottom_corner",
+        "index": 1
+      },
+      {
+        "id": "c1",
+        "bbox": [
+          920,
+          33,
+          315,
+          27
+        ],
+        "bbox_work": [
+          690,
+          25,
+          236,
+          20
+        ],
+        "kind": "text",
+        "confidence": 0.8711,
+        "appear_rate": 0.9978,
+        "zone": "top_corner",
+        "reason": "规则：置信度 0.87，位于 top_corner",
+        "index": 2
+      }
+    ],
+    "review_source": "rules",
+    "policy": {
+      "min_confidence": 0.45,
+      "max_regions": 6,
+      "always_keep_top": 1,
+      "notes": "置信度不足 min_confidence 的候选默认丢弃；LLM 复核只能在这些候选里挑，不能新增。"
+    },
+    "elapsed": 1.11
+  },
+  "mask": {
+    "coverage": 0.03631,
+    "regions": [
+      {
+        "id": "c2",
+        "bbox": [
+          9,
+          614,
+          239,
+          81
+        ],
+        "ink_ratio": 1.0,
+        "pad": [
+          -26,
+          -9
+        ],
+        "ink_threshold": 0.6,
+        "dilate_extra": 2,
+        "attenuation": 0.56,
+        "attenuated": true
+      },
+      {
+        "id": "c1",
+        "bbox": [
+          876,
+          29,
+          403,
+          35
+        ],
+        "ink_ratio": 1.0,
+        "pad": [
+          -44,
+          -4
+        ],
+        "ink_threshold": 0.6,
+        "dilate_extra": 2,
+        "attenuation": 0.68,
+        "attenuated": true
+      }
+    ],
+    "plan": {
+      "attempt": 2,
+      "method": "ns",
+      "radius": 8,
+      "blur_mix": 0.25,
+      "feather_sigma": 9.0,
+      "dilate_extra": 4,
+      "ink_threshold": 0.45,
+      "pad_ratio": 0.14,
+      "attenuation_ratio": 0.85,
+      "texture_gain": 3.5,
+      "patch_fill": true,
+      "texture": true
+    },
+    "feather_note": "羽化：cv2.GaussianBlur(binary, (0,0), sigma=5~10)，回贴时做 alpha 软合成"
+  },
+  "repair": {
+    "params": {
+      "method": "ns",
+      "radius": 8,
+      "blur_mix": 0.25,
+      "patch_fill": true,
+      "texture": true,
+      "texture_sigma": 8.0,
+      "texture_gain": 3.5
+    },
+    "stats": {
+      "frames_written": 180,
+      "fps": 30.0,
+      "size": [
+        1280,
+        720
+      ],
+      "duration": 6.0,
+      "method": "ns",
+      "radius": 8,
+      "blur_mix": 0.25,
+      "patch": {
+        "enabled": true,
+        "regions": [
+          {
+            "id": "c2",
+            "samples": 180,
+            "applied_frames": 180,
+            "offset": [
+              279,
+              0
+            ]
+          },
+          {
+            "id": "c1",
+            "samples": 180,
+            "applied_frames": 180,
+            "offset": [
+              0,
+              52
+            ]
+          }
+        ]
+      },
+      "texture": {
+        "enabled": true,
+        "sigma": 8.0,
+        "gain_cap": 3.5,
+        "regions": [
+          {
+            "id": "c2",
+            "samples": 180,
+            "gain_avg": 1.945,
+            "applied_frames": 122
+          },
+          {
+            "id": "c1",
+            "samples": 180,
+            "gain_avg": 1.147,
+            "applied_frames": 101
+          }
+        ]
+      },
+      "regions": [
+        {
+          "id": "c2",
+          "samples": 30,
+          "var_ratio_avg": 0.1274,
+          "var_ratio_max": 0.7874,
+          "tex_ratio_avg": 0.0929,
+          "tex_ratio_max": 0.438,
+          "edge_ratio_avg": 1.3908,
+          "lum_diff_avg": 0.0893,
+          "edge_ratio_max": 3.5551
+        },
+        {
+          "id": "c1",
+          "samples": 30,
+          "var_ratio_avg": 0.2568,
+          "var_ratio_max": 0.6643,
+          "tex_ratio_avg": 0.1059,
+          "tex_ratio_max": 0.2749,
+          "edge_ratio_avg": 1.8912,
+          "lum_diff_avg": 0.2071,
+          "edge_ratio_max": 6.6376
+        }
+      ],
+      "output": "E:\\123\\video_dewatermark\\backend\\outputs\\pagedemo01\\attempt_2\\inpainted.mp4"
+    },
+    "elapsed": 43.225
+  },
+  "refine": {
+    "applied": true,
+    "params": {
+      "method": "ns",
+      "radius": 8,
+      "blur_mix": 0.35,
+      "patch_fill": true,
+      "texture": true,
+      "texture_sigma": 8.0,
+      "texture_gain": 3.5
+    },
+    "problems": {
+      "c1": "edge_residual"
+    },
+    "reason": null,
+    "elapsed": 42.785
+  },
+  "review_summary": {
+    "passed": true,
+    "score": 76.7,
+    "attempt": 2,
+    "failures": [],
+    "comment": "修复区纹理与邻域一致（最差纹理方差差 0.14），边缘密度比 0.87（背景无边缘，已豁免），肉眼看不出修痕。"
+  },
+  "llm": {
+    "configured": false,
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-chat",
+    "timeout": 90.0,
+    "usage": {
+      "calls": 0,
+      "ok": 0,
+      "failed": 0,
+      "degraded": 5,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "last_error": "未配置 DEEPSEEK_API_KEY（reviewer_comment 用规则）",
+      "last_latency": null
+    },
+    "client_error": null
+  },
+  "trace": [
+    {
+      "agent": "detector",
+      "seconds": 1.11,
+      "regions": 2,
+      "candidates": 2
+    },
+    {
+      "agent": "mask",
+      "seconds": 0.021,
+      "regions": 2,
+      "coverage": 0.03188
+    },
+    {
+      "agent": "inpainter",
+      "seconds": 13.673,
+      "frames": 180,
+      "method": "telea",
+      "radius": 5
+    },
+    {
+      "agent": "refiner",
+      "seconds": 27.342,
+      "applied": true,
+      "problems": 2
+    },
+    {
+      "agent": "reviewer",
+      "seconds": 0.485,
+      "passed": false,
+      "score": 47.12,
+      "attempt": 1
+    },
+    {
+      "agent": "mask",
+      "seconds": 0.022,
+      "regions": 2,
+      "coverage": 0.03631
+    },
+    {
+      "agent": "inpainter",
+      "seconds": 43.225,
+      "frames": 180,
+      "method": "ns",
+      "radius": 8
+    },
+    {
+      "agent": "refiner",
+      "seconds": 42.785,
+      "applied": true,
+      "problems": 1
+    },
+    {
+      "agent": "reviewer",
+      "seconds": 0.493,
+      "passed": true,
+      "score": 76.7,
+      "attempt": 2
+    }
+  ],
+  "artifacts": [
+    "detect_support.jpg",
+    "detect_preview.jpg",
+    "mask.png",
+    "mask_heat.png"
+  ],
+  "outputs": {
+    "clean_video": "clean.mp4",
+    "detect_report": "detect_report.json",
+    "review_report": "review_report.json"
+  }
+}
